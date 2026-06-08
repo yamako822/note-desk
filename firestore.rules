@@ -56,6 +56,23 @@ service cloud.firestore {
         && validAttachmentAt(files, 2);
     }
 
+    function validMemo(data) {
+      return data.keys().hasOnly(["title", "body", "tags", "updatedAt", "favorite", "pinned", "reminderAt"])
+        && data.keys().hasAll(["title", "body", "tags", "updatedAt", "favorite", "pinned"])
+        && data.title is string
+        && data.title.size() >= 1
+        && data.title.size() <= 120
+        && data.body is string
+        && data.body.size() >= 1
+        && data.body.size() <= 10000
+        && validTags(data.tags)
+        && data.updatedAt is string
+        && data.updatedAt.size() <= 40
+        && data.favorite is bool
+        && data.pinned is bool
+        && (!data.keys().hasAny(["reminderAt"]) || (data.reminderAt is string && data.reminderAt.size() <= 40));
+    }
+
     function validNote(data) {
       return data.keys().hasOnly(["title", "body", "tags", "notebook", "type", "archived", "attachments", "updatedAt", "favorite", "pinned", "reminderAt"])
         && data.keys().hasAll(["title", "body", "tags", "notebook", "type", "archived", "attachments", "updatedAt", "favorite", "pinned"])
@@ -78,6 +95,12 @@ service cloud.firestore {
         && data.favorite is bool
         && data.pinned is bool
         && (!data.keys().hasAny(["reminderAt"]) || (data.reminderAt is string && data.reminderAt.size() <= 40));
+    }
+
+    // 既存の Memo Desk を残すため、旧メモ保存先も許可する
+    match /users/{userId}/memos/{memoId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && validMemo(request.resource.data);
     }
 
     // ログインした本人だけが、自分のノートを読み書きできる
