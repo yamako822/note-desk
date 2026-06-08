@@ -1,7 +1,7 @@
 {
-  "name": "Memo Desk",
-  "short_name": "Memo Desk",
-  "description": "メモを整理する",
+  "name": "NoteDesk",
+  "short_name": "NoteDesk",
+  "description": "ノートを整理する",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

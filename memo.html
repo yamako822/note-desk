@@ -4,26 +4,26 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0f766e">
-    <meta name="description" content="メモを整理する">
+    <meta name="description" content="ノートを整理する">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Memo Desk">
-    <title>Memo Desk | Memos</title>
-    <link rel="manifest" href="manifest.webmanifest?v=15">
+    <meta name="apple-mobile-web-app-title" content="NoteDesk">
+    <title>NoteDesk | Notes</title>
+    <link rel="manifest" href="manifest.webmanifest?v=16">
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=15">
+    <link rel="stylesheet" href="styles.css?v=16">
   </head>
   <body>
     <main id="appScreen" class="app" hidden>
-      <p class="app-loading" id="appLoading" hidden>メモを読み込み中…</p>
+      <p class="app-loading" id="appLoading" hidden>ノートを読み込み中…</p>
 
       <section class="editor" aria-labelledby="editor-title">
         <div class="app-header">
           <div>
-            <p class="eyebrow">Memo Desk</p>
-            <h1 id="editor-title">メモを整理する</h1>
+            <p class="eyebrow">NoteDesk</p>
+            <h1 id="editor-title">ノートを整理する</h1>
           </div>
           <div class="header-actions">
             <button type="button" class="secondary icon-button" id="settingsButton" title="設定" aria-label="設定">⚙︎</button>
@@ -34,10 +34,45 @@
 
         <form id="memoForm" class="memo-form" novalidate>
           <p class="form-error" id="formError" hidden></p>
-          <input id="memoTitle" type="text" maxlength="120" placeholder="タイトル" autocomplete="off" aria-required="true">
-          <textarea id="memoBody" rows="8" maxlength="10000" placeholder="本文を書いてください" aria-required="true"></textarea>
+          <div class="note-meta-row">
+            <label for="noteNotebook">
+              <span>ノートブック</span>
+              <select id="noteNotebook"></select>
+            </label>
+            <label for="customNotebookInput">
+              <span>新しい分類</span>
+              <input id="customNotebookInput" type="text" maxlength="32" placeholder="例: 仕事, 学習" autocomplete="off">
+            </label>
+            <label for="noteTemplateSelect">
+              <span>テンプレート</span>
+              <select id="noteTemplateSelect">
+                <option value="">テンプレートなし</option>
+                <option value="meeting">議事録</option>
+                <option value="daily">日報</option>
+                <option value="todo">ToDo</option>
+                <option value="idea">アイデア</option>
+                <option value="study">学習ノート</option>
+              </select>
+            </label>
+            <label for="noteTypeSelect">
+              <span>形式</span>
+              <select id="noteTypeSelect">
+                <option value="text">ノート</option>
+                <option value="checklist">チェックリスト</option>
+              </select>
+            </label>
+          </div>
+          <input id="memoTitle" type="text" maxlength="120" placeholder="ノートタイトル" autocomplete="off" aria-required="true">
+          <div class="editor-tools" aria-label="本文ツール">
+            <button type="button" class="secondary" data-markdown-action="heading" title="見出しを挿入">H</button>
+            <button type="button" class="secondary" data-markdown-action="bold" title="太字を挿入">B</button>
+            <button type="button" class="secondary" data-markdown-action="bullet" title="箇条書きを挿入">•</button>
+            <button type="button" class="secondary" data-markdown-action="check" title="チェック項目を挿入">☑</button>
+            <button type="button" class="secondary" data-markdown-action="link" title="リンクを挿入">🔗</button>
+          </div>
+          <textarea id="memoBody" rows="10" maxlength="10000" placeholder="Markdownで本文を書けます。見出し、箇条書き、チェックリスト、リンクに対応しています。" aria-required="true"></textarea>
           <div class="tag-input-row">
-            <input id="memoTags" type="text" maxlength="260" placeholder="タグ（例: 勉強, アイデア）" autocomplete="off">
+            <input id="memoTags" type="text" maxlength="260" placeholder="タグ（例: 学習, アイデア）" autocomplete="off">
             <button type="button" class="secondary" id="autoTagButton">自動タグ</button>
           </div>
           <div id="tagSuggestList" class="tag-suggest-list" style="display:none;max-height:120px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;background:var(--field);margin-top:4px;">
@@ -47,20 +82,37 @@
             <span>リマインダー</span>
             <input id="memoReminder" type="datetime-local">
           </label>
+          <div class="attachment-control">
+            <label for="noteAttachmentInput">添付画像・ファイル</label>
+            <input id="noteAttachmentInput" type="file" multiple accept="image/*,.pdf,.txt,.md,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx">
+            <div class="attachment-list" id="attachmentList" aria-live="polite"></div>
+          </div>
           <div class="form-actions">
             <button type="button" class="secondary" id="clearButton">クリア</button>
-            <button type="submit" id="saveButton">保存する</button>
+            <button type="submit" id="saveButton">ノートを保存</button>
           </div>
         </form>
       </section>
 
       <section class="library" aria-labelledby="library-title">
         <div class="toolbar">
-          <h2 id="library-title">メモ一覧</h2>
+          <h2 id="library-title">ノート一覧</h2>
           <div class="toolbar-actions">
             <button type="button" class="secondary" id="newMemoButton">新規</button>
             <button type="button" class="secondary favorite-filter-button" id="favoriteFilterButton" aria-pressed="false" aria-label="お気に入りフィルター">☆</button>
+            <label class="visually-hidden" for="notebookFilterSelect">ノートブック</label>
+            <select id="notebookFilterSelect" aria-label="ノートブックで絞り込み"></select>
             <button type="button" class="secondary tag-filter-button" id="tagFilterButton" aria-haspopup="dialog" aria-expanded="false">タグ絞り込み</button>
+            <label class="visually-hidden" for="dateViewSelect">日付ビュー</label>
+            <select id="dateViewSelect" aria-label="日付ビュー">
+              <option value="active">アクティブ</option>
+              <option value="all">全ノート</option>
+              <option value="today">今日</option>
+              <option value="week">今週</option>
+              <option value="month">今月</option>
+              <option value="reminder">リマインダーあり</option>
+              <option value="archive">アーカイブ</option>
+            </select>
             <label class="visually-hidden" for="sortSelect">並び替え</label>
             <select id="sortSelect" aria-label="並び替え">
               <option value="updatedDesc">更新が新しい順</option>
@@ -75,7 +127,7 @@
         <!-- 表示設定は設定ポップアップ内に移動しました -->
 
         <div class="memo-list" id="memoList"></div>
-        <nav class="pagination" id="pagination" aria-label="メモ一覧のページ送り"></nav>
+        <nav class="pagination" id="pagination" aria-label="ノート一覧のページ送り"></nav>
       </section>
     </main>
 
@@ -91,14 +143,19 @@
             <button type="button" class="favorite-button" aria-pressed="false" aria-label="お気に入りに追加">☆</button>
           </div>
         </div>
+        <p class="note-card-meta"><span class="notebook-chip"></span><span class="note-type-chip"></span></p>
         <p class="memo-reminder" hidden></p>
         <div class="memo-preview">
           <p class="memo-body"></p>
         </div>
+        <p class="attachment-summary" hidden></p>
         <div class="memo-tags"></div>
         <div class="card-actions">
           <button type="button" class="secondary open-button">開く</button>
           <button type="button" class="secondary edit-button">編集</button>
+          <button type="button" class="secondary duplicate-button">複製</button>
+          <button type="button" class="secondary export-button">MD出力</button>
+          <button type="button" class="secondary archive-button">保管</button>
           <button type="button" class="danger delete-button">削除</button>
         </div>
       </article>
@@ -108,23 +165,33 @@
       <article class="memo-dialog-panel">
         <div class="memo-dialog-header">
           <div>
-            <p class="eyebrow">Memo Desk</p>
+            <p class="eyebrow">NoteDesk</p>
             <h2 id="memoDialogTitle"></h2>
             <time id="memoDialogTime"></time>
           </div>
           <button type="button" class="secondary icon-close-button" id="memoDialogCloseButton" aria-label="閉じる">×</button>
         </div>
+        <div class="note-search-row">
+          <input id="memoDialogSearch" type="search" placeholder="このノート内を検索" autocomplete="off">
+          <span id="memoDialogSearchStatus"></span>
+        </div>
+        <nav class="note-toc" id="memoDialogToc" aria-label="ノートの目次" hidden></nav>
         <div class="memo-dialog-body" id="memoDialogBody"></div>
         <div class="memo-dialog-schedule" id="memoDialogSchedule" hidden>
           <p class="memo-dialog-reminder" id="memoDialogReminder" hidden></p>
           <button type="button" class="secondary outlook-calendar-button" id="memoDialogOutlookButton" disabled title="リマインダー日時を設定すると予定に追加できます">Outlook予定に追加</button>
         </div>
         <p class="calendar-download-status" id="calendarDownloadStatus" aria-live="polite" hidden></p>
+        <div class="attachment-list dialog-attachments" id="memoDialogAttachments"></div>
         <div class="memo-tags" id="memoDialogTags"></div>
         <div class="card-actions">
           <button type="button" class="secondary" id="memoDialogPinButton">ピン留め</button>
           <button type="button" class="secondary" id="memoDialogFavoriteButton">お気に入り</button>
+          <button type="button" class="secondary" id="memoDialogDuplicateButton">複製</button>
+          <button type="button" class="secondary" id="memoDialogExportMdButton">MD出力</button>
+          <button type="button" class="secondary" id="memoDialogExportTxtButton">TXT出力</button>
           <button type="button" class="secondary" id="memoDialogEditButton">編集</button>
+          <button type="button" class="secondary" id="memoDialogArchiveButton">アーカイブ</button>
           <button type="button" class="danger" id="memoDialogDeleteButton">削除</button>
         </div>
       </article>
@@ -134,9 +201,9 @@
       <article class="tag-filter-dialog-panel">
         <div class="tag-filter-dialog-header">
           <div>
-            <p class="eyebrow">Memo Desk</p>
+            <p class="eyebrow">NoteDesk</p>
             <h2 id="tagFilterDialogTitle">タグ絞り込み</h2>
-            <p class="tag-filter-status" id="tagFilterStatus">すべてのメモを表示中</p>
+            <p class="tag-filter-status" id="tagFilterStatus">すべてのノートを表示中</p>
           </div>
           <button type="button" class="secondary icon-close-button" id="tagFilterDialogCloseButton" aria-label="閉じる">×</button>
         </div>
@@ -148,7 +215,7 @@
       <article class="help-dialog-panel">
         <div class="help-dialog-header">
           <div>
-            <p class="eyebrow">Memo Desk</p>
+            <p class="eyebrow">NoteDesk</p>
             <h2 id="helpDialogTitle">使い方ガイド</h2>
           </div>
           <button type="button" class="secondary icon-close-button" id="helpDialogCloseButton" aria-label="閉じる">×</button>
@@ -157,52 +224,56 @@
           <p class="help-intro">よく使う機能を画像付きでまとめました。操作に迷ったら、まずこの順番で確認してください。</p>
           <div class="help-guide">
             <section class="help-card" aria-labelledby="helpCreateTitle">
-              <img src="images/help-memo-create.svg?v=4" alt="タイトル、本文、タグ、リマインダーを入力して保存する画面">
+              <img src="images/help-memo-create.svg?v=5" alt="タイトル、本文、タグ、ノートブック、リマインダーを入力して保存する画面">
               <div>
-                <h3 id="helpCreateTitle">メモを作る</h3>
-                <p>左側にタイトルと本文を入力し、必要ならタグやリマインダー日時を追加して保存します。タグが空の場合は自動タグも使えます。</p>
+                <h3 id="helpCreateTitle">ノートを作る</h3>
+                <p>左側にタイトルと本文を入力し、ノートブック、タグ、リマインダー、添付を追加して保存します。テンプレートや自動タグも使えます。</p>
               </div>
             </section>
             <section class="help-card" aria-labelledby="helpFindTitle">
-              <img src="images/help-find-filter.svg?v=4" alt="検索、並び替え、タグ絞り込みでメモを探す画面">
+              <img src="images/help-find-filter.svg?v=5" alt="検索、並び替え、タグ絞り込みでノートを探す画面">
               <div>
                 <h3 id="helpFindTitle">探す・絞り込む</h3>
-                <p>検索欄でタイトル・本文・タグを横断検索できます。タグ絞り込み、スター絞り込み、並び替えを組み合わせると目的のメモをすばやく見つけられます。</p>
+                <p>検索欄でタイトル・本文・タグ・ノートブックを横断検索できます。タグ、ノートブック、日付ビューを組み合わせると目的のノートをすばやく見つけられます。</p>
               </div>
             </section>
             <section class="help-card" aria-labelledby="helpOrganizeTitle">
-              <img src="images/help-organize.svg?v=4" alt="ピン留め、お気に入り、カード表示でメモを整理する画面">
+              <img src="images/help-organize.svg?v=5" alt="ピン留め、お気に入り、カード表示でノートを整理する画面">
               <div>
                 <h3 id="helpOrganizeTitle">整理する</h3>
-                <p>重要なメモはピン留めで上に固定し、よく使うメモはスターでお気に入りにします。設定からグリッド表示とリスト表示も切り替えられます。</p>
+                <p>重要なノートはピン留めで上に固定し、よく使うノートはスターでお気に入りにします。複製、アーカイブ、Markdown出力も使えます。</p>
               </div>
             </section>
             <section class="help-card" aria-labelledby="helpSettingsTitle">
-              <img src="images/help-settings.svg?v=4" alt="設定画面で表示、カラー、自動下書き保存を変更する画面">
+              <img src="images/help-settings.svg?v=5" alt="設定画面で表示、カラー、自動下書き保存を変更する画面">
               <div>
                 <h3 id="helpSettingsTitle">表示と下書き</h3>
-                <p>歯車からダークモード、明るさ、カスタムカラー、表示形式、自動下書き保存を変更できます。入力途中のメモを残したい時は自動下書き保存が便利です。</p>
+                <p>歯車からダークモード、明るさ、カスタムカラー、表示形式、自動下書き保存を変更できます。入力途中のノートを残したい時は自動下書き保存が便利です。</p>
               </div>
             </section>
           </div>
           <section class="outlook-help" aria-labelledby="outlookHelpTitle">
             <h3 id="outlookHelpTitle">Outlookでリマインダー通知を受ける</h3>
-            <p>メモのリマインダー日付から通知付き予定ファイルを作り、Outlookにはその日の朝8:00開始の予定として登録できます。</p>
+            <p>ノートのリマインダー日付から通知付き予定ファイルを作り、Outlookにはその日の朝8:00開始の予定として登録できます。</p>
             <div class="outlook-help-steps">
               <figure>
-                <img src="images/outlook-help-step-1.svg?v=4" alt="メモのリマインダー日時を入力する画面">
-                <figcaption><strong>1. 日付を入れて保存</strong><span>メモのリマインダー欄に通知したい日付を設定します。</span></figcaption>
+                <img src="images/outlook-help-step-1.svg?v=5" alt="ノートのリマインダー日時を入力する画面">
+                <figcaption><strong>1. 日付を入れて保存</strong><span>ノートのリマインダー欄に通知したい日付を設定します。</span></figcaption>
               </figure>
               <figure>
-                <img src="images/outlook-help-step-2.svg?v=4" alt="メモ詳細でOutlook予定に追加ボタンを押す画面">
-                <figcaption><strong>2. Outlook予定に追加</strong><span>メモを開き、予定エリアのボタンから朝8:00開始の .ics ファイルを作成します。</span></figcaption>
+                <img src="images/outlook-help-step-2.svg?v=5" alt="ノート詳細でOutlook予定に追加ボタンを押す画面">
+                <figcaption><strong>2. Outlook予定に追加</strong><span>ノートを開き、予定エリアのボタンから朝8:00開始の .ics ファイルを作成します。</span></figcaption>
               </figure>
               <figure>
-                <img src="images/outlook-help-step-3.svg?v=4" alt=".icsファイルをOutlook予定表に登録する画面">
+                <img src="images/outlook-help-step-3.svg?v=5" alt=".icsファイルをOutlook予定表に登録する画面">
                 <figcaption><strong>3. Outlookで保存</strong><span>ダウンロードした .ics を開くと、その日の朝8:00の予定として保存できます。</span></figcaption>
               </figure>
             </div>
             <p class="muted">通知タイミングは設定画面の「Outlook予定」で変更できます。予定時刻を選ぶと朝8:00に通知されます。カレンダー登録後、ダウンロードした .ics ファイルは削除してOKです。</p>
+          </section>
+          <section class="outlook-help" aria-labelledby="noteFeatureHelpTitle">
+            <h3 id="noteFeatureHelpTitle">ノート機能</h3>
+            <p>Markdownの見出しから目次を自動生成し、チェックリスト、テンプレート、本文内検索、添付、ノート複製、アーカイブ、MD/TXT出力が使えます。</p>
           </section>
         </div>
       </article>
@@ -277,7 +348,7 @@
 
           <div class="settings-section">
             <h3>表示</h3>
-            <p class="muted">メモ一覧の表示形式を変更できます。</p>
+            <p class="muted">ノート一覧の表示形式を変更できます。</p>
             <div class="layout-settings">
               <label class="switch-control">
                 <input id="layoutGridRadio" type="radio" name="layout" value="grid">
@@ -315,7 +386,7 @@
 
           <div class="settings-section">
             <h3>データ</h3>
-            <p class="muted">この操作はこのブラウザ内に保存されたローカルメモを完全に削除します。クラウド同期（ログイン済み）を利用中のメモには影響しません。</p>
+            <p class="muted">この操作はこのブラウザ内に保存されたローカルノートを完全に削除します。クラウド同期（ログイン済み）を利用中のノートには影響しません。</p>
             <div class="settings-actions" style="margin-top:8px;">
               <button type="button" class="danger" id="settingsClearLocalButton">ローカルデータを削除</button>
             </div>
@@ -336,7 +407,7 @@
       </article>
     </div>
 
-    <script type="module" src="app.js?v=15"></script>
-    <script src="pwa.js?v=15"></script>
+    <script type="module" src="app.js?v=16"></script>
+    <script src="pwa.js?v=16"></script>
   </body>
 </html>

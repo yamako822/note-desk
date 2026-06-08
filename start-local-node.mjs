@@ -54,5 +54,5 @@ const server = createServer((request, response) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`Memo Desk local server: http://${host}:${port}/`);
+  console.log(`NoteDesk local server: http://${host}:${port}/`);
 });

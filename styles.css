@@ -379,6 +379,35 @@ h2 {
   margin-top: 22px;
 }
 
+.note-meta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: end;
+}
+
+.note-meta-row label,
+.attachment-control {
+  display: grid;
+  gap: 6px;
+}
+
+.editor-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.editor-tools button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-height: 38px;
+  padding: 8px;
+  font-size: 14px;
+}
+
 .form-error {
   margin: 0;
   padding: 10px 12px;
@@ -445,6 +474,68 @@ textarea {
   gap: 6px;
 }
 
+.attachment-control input[type="file"] {
+  padding: 9px 10px;
+}
+
+.attachment-list {
+  display: grid;
+  gap: 8px;
+}
+
+.attachment-list[hidden] {
+  display: none;
+}
+
+.attachment-item {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+}
+
+.attachment-item img,
+.attachment-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--soft);
+}
+
+.attachment-icon {
+  display: grid;
+  place-items: center;
+  color: var(--accent-dark);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.attachment-item a {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-item span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.attachment-remove {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
 input:focus,
 select:focus,
 textarea:focus,
@@ -463,6 +554,7 @@ button {
   font-size: 14px;
   font-weight: 700;
   line-height: 1.35;
+  white-space: nowrap;
 }
 
 button:hover {
@@ -491,8 +583,16 @@ button:hover {
 
 .form-actions,
 .card-actions {
+  display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.card-actions button,
+.toolbar-actions button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .memo-dialog-panel .card-actions {
@@ -511,11 +611,14 @@ button:hover {
 
 .toolbar input {
   max-width: 280px;
+  min-width: 180px;
+  flex: 0 0 180px;
 }
 
 .toolbar select {
   width: auto;
   min-width: 150px;
+  flex: 0 0 auto;
   padding: 9px 34px 9px 11px;
   font-size: 14px;
   line-height: 1.35;
@@ -525,11 +628,17 @@ button:hover {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
   min-width: 0;
-  overflow-x: auto;
+  overflow: visible;
+  white-space: nowrap;
   padding-bottom: 2px;
   scrollbar-width: thin;
+}
+
+#notebookFilterSelect {
+  min-width: 190px;
 }
 
 .favorite-filter-button.active {
@@ -672,10 +781,10 @@ button:hover {
 
 .memo-list.list-view .memo-card {
   display: grid;
-  grid-template-columns: minmax(150px, 0.75fr) minmax(0, 1.4fr) minmax(120px, 0.75fr) auto;
+  grid-template-columns: minmax(150px, 0.75fr) minmax(0, 1.35fr) minmax(120px, 0.75fr) auto;
   grid-template-areas:
     "header preview tags actions"
-    "header reminder tags actions";
+    "meta reminder tags actions";
   align-items: center;
   gap: 12px;
   min-height: auto;
@@ -719,9 +828,18 @@ button:hover {
   margin: 0;
 }
 
+.memo-list.list-view .note-card-meta {
+  grid-area: meta;
+  margin: 0;
+}
+
 .memo-list.list-view .memo-tags {
   grid-area: tags;
   max-height: 34px;
+}
+
+.memo-list.list-view .attachment-summary {
+  display: none;
 }
 
 .memo-list.list-view .card-actions {
@@ -763,15 +881,19 @@ button:hover {
 
 .memo-card {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto auto;
   gap: 12px;
-  min-height: 280px;
-  max-height: 280px;
+  min-height: 330px;
+  max-height: 330px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 15px;
   background: var(--card-bg);
   overflow: hidden;
+}
+
+.memo-card.is-archived {
+  opacity: 0.72;
 }
 
 .memo-card.is-favorite {
@@ -788,6 +910,42 @@ button:hover {
   box-shadow:
     inset 3px 0 0 var(--pin-line),
     inset 0 3px 0 var(--favorite-line);
+}
+
+.note-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+  margin: -2px 0 0;
+  overflow: hidden;
+}
+
+.notebook-chip,
+.note-type-chip,
+.attachment-summary {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--soft);
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.note-type-chip {
+  border-color: var(--line);
+  background: var(--field);
+  color: var(--muted);
+}
+
+.attachment-summary {
+  border-style: dashed;
 }
 
 .memo-card-header {
@@ -853,8 +1011,58 @@ time {
   color: var(--text);
   font-size: 14px;
   line-height: 1.7;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.memo-body p,
+.memo-dialog-body p,
+.memo-body ul,
+.memo-dialog-body ul {
+  margin: 0 0 8px;
+}
+
+.memo-body h3,
+.memo-body h4,
+.memo-body h5,
+.memo-dialog-body h3,
+.memo-dialog-body h4,
+.memo-dialog-body h5 {
+  margin: 0 0 8px;
+  font-size: 1em;
+  line-height: 1.45;
+}
+
+.memo-dialog-body h3 {
+  font-size: 18px;
+}
+
+.memo-dialog-body h4 {
+  font-size: 16px;
+}
+
+.memo-dialog-body a {
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+
+.rendered-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.rendered-check input {
+  flex: 0 0 auto;
+  width: 16px;
+  margin-top: 3px;
+}
+
+mark {
+  border-radius: 3px;
+  padding: 0 2px;
+  background: var(--favorite-bg);
+  color: var(--text);
 }
 
 .memo-tags {
@@ -1387,7 +1595,7 @@ time {
 
 .memo-dialog-panel {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto auto auto;
   gap: 16px;
   width: min(720px, 100%);
   max-height: min(780px, calc(100dvh - 48px));
@@ -1397,6 +1605,51 @@ time {
   background: var(--panel);
   color: var(--text);
   box-shadow: var(--shadow);
+}
+
+.note-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.note-search-row span {
+  min-width: 40px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.note-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+}
+
+.note-toc[hidden] {
+  display: none;
+}
+
+.toc-link {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--accent-dark);
+  font-size: 12px;
+}
+
+.toc-link.level-2 {
+  margin-left: 8px;
+}
+
+.toc-link.level-3 {
+  margin-left: 16px;
 }
 
 .memo-dialog-header {
@@ -1437,8 +1690,12 @@ time {
   background: var(--card-bg);
   font-size: 15px;
   line-height: 1.75;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.dialog-attachments {
+  max-height: 170px;
+  overflow: auto;
 }
 
 .memo-dialog-panel .memo-tags {
@@ -1496,6 +1753,8 @@ time {
 
   .toolbar input {
     max-width: none;
+    min-width: 0;
+    flex: 0 0 auto;
   }
 
   .toolbar select {
@@ -1504,6 +1763,10 @@ time {
 
   .display-settings {
     grid-template-columns: 1fr;
+  }
+
+  .note-meta-row {
+    grid-template-columns: 1fr 1fr;
   }
 
   .memo-dialog-schedule {
@@ -1544,6 +1807,7 @@ time {
     grid-template-columns: 1fr;
     grid-template-areas:
       "header"
+      "meta"
       "preview"
       "reminder"
       "tags"
@@ -1554,5 +1818,29 @@ time {
   .memo-list.list-view .card-actions {
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 560px) {
+  .note-meta-row {
+    grid-template-columns: 1fr;
+  }
+
+  .note-search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .note-search-row span {
+    text-align: left;
+  }
+
+  .attachment-item {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+  }
+
+  .attachment-item img,
+  .attachment-icon {
+    width: 36px;
+    height: 36px;
   }
 }

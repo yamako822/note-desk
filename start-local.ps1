@@ -38,7 +38,7 @@ function Resolve-SafePath {
 }
 
 $listener.Start()
-Write-Host "Memo Desk local server: $prefix"
+Write-Host "NoteDesk local server: $prefix"
 Write-Host "Stop: Ctrl+C"
 
 while ($listener.IsListening) {

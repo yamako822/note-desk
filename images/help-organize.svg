@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" role="img" aria-labelledby="title desc">
-  <title id="title">メモを整理する</title>
-  <desc id="desc">ピン留めとお気に入りの操作が強調されたメモカード画面。</desc>
+  <title id="title">ノートを整理する</title>
+  <desc id="desc">ピン留めとお気に入りの操作が強調されたノートカード画面。</desc>
   <rect width="480" height="270" rx="18" fill="#f7f5f0"/>
   <rect x="48" y="38" width="190" height="176" rx="14" fill="#ffffff" stroke="#dedbd2"/>
   <rect x="262" y="38" width="190" height="176" rx="14" fill="#ffffff" stroke="#dedbd2"/>

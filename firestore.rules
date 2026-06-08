@@ -25,9 +25,40 @@ service cloud.firestore {
         && validTag(tags, 9);
     }
 
-    function validMemo(data) {
-      return data.keys().hasOnly(["title", "body", "tags", "updatedAt", "favorite", "pinned", "reminderAt"])
-        && data.keys().hasAll(["title", "body", "tags", "updatedAt", "favorite", "pinned"])
+    function validAttachment(file) {
+      return file is map
+        && file.keys().hasOnly(["id", "name", "type", "size", "dataUrl", "createdAt"])
+        && file.id is string
+        && file.id.size() <= 80
+        && file.name is string
+        && file.name.size() >= 1
+        && file.name.size() <= 120
+        && file.type is string
+        && file.type.size() <= 100
+        && file.size is number
+        && file.size >= 0
+        && file.size <= 225280
+        && file.dataUrl is string
+        && file.dataUrl.size() <= 320000
+        && file.createdAt is string
+        && file.createdAt.size() <= 40;
+    }
+
+    function validAttachmentAt(files, index) {
+      return files.size() <= index || validAttachment(files[index]);
+    }
+
+    function validAttachments(files) {
+      return files is list
+        && files.size() <= 3
+        && validAttachmentAt(files, 0)
+        && validAttachmentAt(files, 1)
+        && validAttachmentAt(files, 2);
+    }
+
+    function validNote(data) {
+      return data.keys().hasOnly(["title", "body", "tags", "notebook", "type", "archived", "attachments", "updatedAt", "favorite", "pinned", "reminderAt"])
+        && data.keys().hasAll(["title", "body", "tags", "notebook", "type", "archived", "attachments", "updatedAt", "favorite", "pinned"])
         && data.title is string
         && data.title.size() >= 1
         && data.title.size() <= 120
@@ -35,6 +66,13 @@ service cloud.firestore {
         && data.body.size() >= 1
         && data.body.size() <= 10000
         && validTags(data.tags)
+        && data.notebook is string
+        && data.notebook.size() >= 1
+        && data.notebook.size() <= 32
+        && data.type is string
+        && (data.type == "text" || data.type == "checklist")
+        && data.archived is bool
+        && validAttachments(data.attachments)
         && data.updatedAt is string
         && data.updatedAt.size() <= 40
         && data.favorite is bool
@@ -42,10 +80,10 @@ service cloud.firestore {
         && (!data.keys().hasAny(["reminderAt"]) || (data.reminderAt is string && data.reminderAt.size() <= 40));
     }
 
-    // ログインした本人だけが、自分のメモを読み書きできる
-    match /users/{userId}/memos/{memoId} {
+    // ログインした本人だけが、自分のノートを読み書きできる
+    match /users/{userId}/notes/{noteId} {
       allow read, delete: if isOwner(userId);
-      allow create, update: if isOwner(userId) && validMemo(request.resource.data);
+      allow create, update: if isOwner(userId) && validNote(request.resource.data);
     }
   }
 }

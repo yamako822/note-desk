@@ -18,12 +18,12 @@ function outlookMorningStart(value) {
   );
 }
 
-test.describe('Memo Desk E2E', () => {
+test.describe('NoteDesk E2E', () => {
   test.beforeEach(async ({ page }) => {
     // ensure local mode and autosave enabled before load
     await page.addInitScript(() => {
-      localStorage.setItem('memo-desk-local-mode', 'true');
-      localStorage.setItem('memo-desk-autosave', 'true');
+      localStorage.setItem('note-desk-local-mode', 'true');
+      localStorage.setItem('note-desk-autosave', 'true');
     });
   });
 
@@ -38,7 +38,7 @@ test.describe('Memo Desk E2E', () => {
     await page.dispatchEvent('#memoBody', 'input');
     // wait for autosave debounce
     await page.waitForTimeout(1200);
-    const draft = await page.evaluate(() => localStorage.getItem('memo-desk-draft'));
+    const draft = await page.evaluate(() => localStorage.getItem('note-desk-draft'));
     expect(draft).not.toBeNull();
     const parsed = JSON.parse(draft);
     expect(parsed.title).toBe('E2E テストタイトル');
@@ -47,7 +47,7 @@ test.describe('Memo Desk E2E', () => {
   test('delete opens confirm dialog and removes memo', async ({ page }) => {
     // seed one local memo
     await page.addInitScript(() => {
-      localStorage.setItem('memo-desk-local-memos', JSON.stringify([
+      localStorage.setItem('note-desk-local-notes', JSON.stringify([
         { id: 'd1', title: '削除対象', body: 'x', tags: [], updatedAt: new Date().toISOString() }
       ]));
     });
@@ -60,7 +60,7 @@ test.describe('Memo Desk E2E', () => {
     // click confirm
     await page.click('#confirmOk');
     await page.waitForTimeout(300);
-    const memos = JSON.parse(await page.evaluate(() => localStorage.getItem('memo-desk-local-memos') || '[]'));
+    const memos = JSON.parse(await page.evaluate(() => localStorage.getItem('note-desk-local-notes') || '[]'));
     expect(memos.length).toBe(0);
   });
 
@@ -73,13 +73,13 @@ test.describe('Memo Desk E2E', () => {
     await page.click('#saveButton');
     await expect(page.locator('.memo-reminder')).toContainText('リマインダー');
 
-    const memos = JSON.parse(await page.evaluate(() => localStorage.getItem('memo-desk-local-memos') || '[]'));
+    const memos = JSON.parse(await page.evaluate(() => localStorage.getItem('note-desk-local-notes') || '[]'));
     expect(memos[0].reminderAt).toContain('2026-06-05');
   });
 
   test('downloads Outlook calendar file with reminder alarm', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('memo-desk-local-memos', JSON.stringify([
+      localStorage.setItem('note-desk-local-notes', JSON.stringify([
         {
           id: 'outlook-reminder',
           title: 'Outlook通知',
@@ -131,12 +131,72 @@ test.describe('Memo Desk E2E', () => {
     await expect(page.locator('#memoTags')).toHaveValue(/仕事/);
   });
 
+  test('supports notebook markdown attachments duplicate archive and export', async ({ page }) => {
+    await page.goto('/memo.html');
+    await page.waitForSelector('#memoTitle');
+
+    await expect(page.locator('[data-markdown-action]')).toHaveCount(5);
+    await page.selectOption('#noteTemplateSelect', 'todo');
+    await expect(page.locator('#noteTypeSelect')).toHaveValue('checklist');
+    await page.fill('#memoTitle', '研究ノート');
+    await page.fill('#customNotebookInput', '研究');
+    await page.fill('#memoBody', '# 見出し\n- [ ] 確認する\n重要キーワードを残す');
+    await page.fill('#memoTags', '研究, 重要');
+    await page.setInputFiles('#noteAttachmentInput', {
+      name: 'sample.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('添付テキスト')
+    });
+    await expect(page.locator('#attachmentList .attachment-item')).toHaveCount(1);
+    await page.click('#saveButton');
+
+    await expect(page.locator('.memo-card-title h3')).toHaveText('研究ノート');
+    await expect(page.locator('.notebook-chip').first()).toHaveText('研究');
+    await expect(page.locator('.note-type-chip').first()).toHaveText('チェックリスト');
+    await expect(page.locator('.attachment-summary')).toContainText('添付 1件');
+
+    await page.click('.open-button');
+    await page.waitForSelector('#memoDialog:not([hidden])');
+    await expect(page.locator('#memoDialogToc')).toBeVisible();
+    await expect(page.locator('#memoDialogToc')).toContainText('見出し');
+    await expect(page.locator('#memoDialogBody h3')).toHaveText('見出し');
+    await expect(page.locator('#memoDialogBody .rendered-check')).toContainText('確認する');
+    await expect(page.locator('#memoDialogAttachments .attachment-item')).toHaveCount(1);
+
+    await page.fill('#memoDialogSearch', '重要キーワード');
+    await expect(page.locator('#memoDialogSearchStatus')).toHaveText('1件');
+    await expect(page.locator('#memoDialogBody mark')).toContainText('重要キーワード');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.click('#memoDialogExportMdButton');
+    const download = await downloadPromise;
+    const filePath = await download.path();
+    const content = fs.readFileSync(filePath, 'utf8');
+    expect(download.suggestedFilename()).toBe('研究ノート.md');
+    expect(content).toContain('# 研究ノート');
+    expect(content).toContain('- ノートブック: 研究');
+
+    await page.click('#memoDialogDuplicateButton');
+    await expect(page.locator('#memoCount')).toHaveText('2件');
+    let notes = JSON.parse(await page.evaluate(() => localStorage.getItem('note-desk-local-notes') || '[]'));
+    expect(notes).toHaveLength(2);
+    expect(notes.some((note) => note.title === '研究ノート コピー')).toBeTruthy();
+
+    await page.click('#memoDialogArchiveButton');
+    await expect(page.locator('#memoDialog')).toBeHidden();
+    await expect(page.locator('.memo-card-title h3')).toHaveText('研究ノート コピー');
+    await page.selectOption('#dateViewSelect', 'archive');
+    await expect(page.locator('.memo-card-title h3')).toHaveText('研究ノート');
+    notes = JSON.parse(await page.evaluate(() => localStorage.getItem('note-desk-local-notes') || '[]'));
+    expect(notes.find((note) => note.title === '研究ノート').archived).toBeTruthy();
+  });
+
   test('restores memo dialog that was open before reload', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('memo-desk-local-memos', JSON.stringify([
+      localStorage.setItem('note-desk-local-notes', JSON.stringify([
         {
           id: 'last-open',
-          title: '前回開いていたメモ',
+          title: '前回開いていたノート',
           body: 'reload restore',
           tags: [],
           updatedAt: new Date().toISOString(),
@@ -145,7 +205,7 @@ test.describe('Memo Desk E2E', () => {
           reminderAt: ''
         }
       ]));
-      localStorage.setItem('memo-desk-last-open-memo', JSON.stringify({
+      localStorage.setItem('note-desk-last-open-note', JSON.stringify({
         id: 'last-open',
         dataMode: 'local',
         uid: 'local',
@@ -155,13 +215,13 @@ test.describe('Memo Desk E2E', () => {
 
     await page.goto('/memo.html');
     await page.waitForSelector('#memoDialog:not([hidden])');
-    await expect(page.locator('#memoDialogTitle')).toHaveText('前回開いていたメモ');
+    await expect(page.locator('#memoDialogTitle')).toHaveText('前回開いていたノート');
   });
 
   test('dark mode keeps settings icon readable', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('memo-desk-display-settings', JSON.stringify({ dark: true, brightness: 100 }));
-      localStorage.setItem('memo-desk-custom-colors', JSON.stringify({
+      localStorage.setItem('note-desk-display-settings', JSON.stringify({ dark: true, brightness: 100 }));
+      localStorage.setItem('note-desk-custom-colors', JSON.stringify({
         accent: '#0f766e',
         bg: '#f7f5f0',
         text: '#202124',
@@ -210,7 +270,7 @@ test.describe('Memo Desk E2E', () => {
     });
 
     await page.addInitScript(() => {
-      localStorage.setItem('memo-desk-local-memos', JSON.stringify([
+      localStorage.setItem('note-desk-local-notes', JSON.stringify([
         {
           id: 'cached-template-reminder',
           title: '古いテンプレート確認',
@@ -231,7 +291,7 @@ test.describe('Memo Desk E2E', () => {
 
   test('settings dialog contains moved home controls and scrolls', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('memo-desk-local-entry', 'true');
+      localStorage.setItem('note-desk-local-entry', 'true');
     });
 
     await page.goto('/memo.html');
@@ -281,16 +341,17 @@ test.describe('Memo Desk E2E', () => {
     await page.waitForSelector('#helpDialog:not([hidden])');
     await expect(page.locator('#helpDialogTitle')).toHaveText('使い方ガイド');
     await expect(page.locator('.help-card')).toHaveCount(4);
-    await expect(page.locator('.help-dialog-body')).toContainText('メモを作る');
+    await expect(page.locator('.help-dialog-body')).toContainText('ノートを作る');
     await expect(page.locator('.help-dialog-body')).toContainText('探す・絞り込む');
     await expect(page.locator('.help-dialog-body')).toContainText('整理する');
     await expect(page.locator('.help-dialog-body')).toContainText('表示と下書き');
     await expect(page.locator('#outlookHelpTitle')).toHaveText('Outlookでリマインダー通知を受ける');
-    await expect(page.locator('.outlook-help figure')).toHaveCount(3);
-    await expect(page.locator('.outlook-help')).toContainText('Outlook予定に追加');
-    await expect(page.locator('.outlook-help')).toContainText('朝8:00');
-    await expect(page.locator('.outlook-help')).toContainText('予定時刻を選ぶと朝8:00');
-    await expect(page.locator('.outlook-help')).toContainText('削除してOK');
+    const outlookHelp = page.locator('[aria-labelledby="outlookHelpTitle"]');
+    await expect(outlookHelp.locator('figure')).toHaveCount(3);
+    await expect(outlookHelp).toContainText('Outlook予定に追加');
+    await expect(outlookHelp).toContainText('朝8:00');
+    await expect(outlookHelp).toContainText('予定時刻を選ぶと朝8:00');
+    await expect(outlookHelp).toContainText('削除してOK');
 
     const images = await page.locator('#helpDialog img').evaluateAll((items) =>
       items.map((img) => ({
@@ -318,16 +379,16 @@ test.describe('Memo Desk E2E', () => {
     expect(combinedSvgText).not.toMatch(/Title|Tags|Save|Memo List|New|Search|Pin|Settings|Dark mode|Grid|List|Reminder 09:30|15 min reminder/);
     expect(combinedSvgText).not.toContain('15分前通知');
     expect(combinedSvgText).toContain('タイトル');
-    expect(combinedSvgText).toContain('メモ一覧');
+    expect(combinedSvgText).toContain('ノート一覧');
     expect(combinedSvgText).toContain('朝8:00予定');
   });
 
   test('tag filter opens dialog and filters by selected tag', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('memo-desk-local-memos', JSON.stringify([
+      localStorage.setItem('note-desk-local-notes', JSON.stringify([
         {
           id: 'tag-1',
-          title: 'コジプロメモ',
+          title: 'コジプロノート',
           body: 'tag filter',
           tags: ['コジプロ'],
           updatedAt: new Date().toISOString(),
@@ -337,7 +398,7 @@ test.describe('Memo Desk E2E', () => {
         },
         {
           id: 'tag-2',
-          title: 'タスクメモ',
+          title: 'タスクノート',
           body: 'tag filter',
           tags: ['タスク'],
           updatedAt: new Date(Date.now() - 1000).toISOString(),
@@ -357,7 +418,7 @@ test.describe('Memo Desk E2E', () => {
     await page.getByRole('button', { name: 'コジプロ', exact: true }).click();
     await expect(page.locator('#tagFilterDialog')).toBeHidden();
     await expect(page.locator('#tagFilterButton')).toHaveText('タグ: コジプロ');
-    await expect(page.locator('.memo-card h3')).toHaveText('コジプロメモ');
+    await expect(page.locator('.memo-card-title h3')).toHaveText('コジプロノート');
 
     await page.click('#tagFilterButton');
     await page.getByRole('button', { name: 'すべて', exact: true }).click();

@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" role="img" aria-labelledby="title desc">
-  <title id="title">メモを探す・絞り込む</title>
-  <desc id="desc">新規、お気に入り、タグ絞り込み、並び替え、検索の操作があるメモ一覧画面。</desc>
+  <title id="title">ノートを探す・絞り込む</title>
+  <desc id="desc">新規、お気に入り、タグ絞り込み、並び替え、検索の操作があるノート一覧画面。</desc>
   <rect width="480" height="270" rx="18" fill="#f7f5f0"/>
   <rect x="44" y="36" width="392" height="198" rx="14" fill="#ffffff" stroke="#dedbd2"/>
-  <text x="70" y="70" fill="#202124" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="22" font-weight="800">メモ一覧</text>
+  <text x="70" y="70" fill="#202124" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="22" font-weight="800">ノート一覧</text>
   <rect x="70" y="92" width="58" height="34" rx="8" fill="#ffffff" stroke="#dedbd2"/>
   <text x="87" y="114" fill="#202124" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="13" font-weight="700">新規</text>
   <rect x="140" y="92" width="44" height="34" rx="8" fill="#fff6d8" stroke="#d3a936"/>

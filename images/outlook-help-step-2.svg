@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" role="img" aria-labelledby="title desc">
   <title id="title">Outlook予定に追加する</title>
-  <desc id="desc">Outlook予定に追加ボタンが強調されたメモ詳細画面。</desc>
+  <desc id="desc">Outlook予定に追加ボタンが強調されたノート詳細画面。</desc>
   <rect width="480" height="270" rx="18" fill="#f7f5f0"/>
   <rect x="48" y="28" width="384" height="214" rx="14" fill="#ffffff" stroke="#dedbd2"/>
   <rect x="72" y="54" width="260" height="24" rx="6" fill="#202124"/>

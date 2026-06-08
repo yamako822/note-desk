@@ -2,18 +2,19 @@ import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
 import { feedbackConfig, isFeedbackConfigured } from "./feedback-config.js";
 
 const FIREBASE_VERSION = "11.6.0";
-const LEGACY_STORAGE_KEY = "memo-desk-notes";
-const DISPLAY_SETTINGS_KEY = "memo-desk-display-settings";
-const SORT_SETTING_KEY = "memo-desk-sort-setting";
-const LOCAL_MODE_KEY = "memo-desk-local-mode";
-const LOCAL_ENTRY_KEY = "memo-desk-local-entry";
-const LOCAL_MEMOS_KEY = "memo-desk-local-memos";
-const LOCAL_DISPLAY_NAME_KEY = "memo-desk-local-display-name";
-const DRAFT_KEY = "memo-desk-draft";
-const CUSTOM_COLORS_KEY = "memo-desk-custom-colors";
-const LAYOUT_SETTING_KEY = "memo-desk-layout-setting";
-const LAST_OPEN_MEMO_KEY = "memo-desk-last-open-memo";
-const OUTLOOK_REMINDER_SETTING_KEY = "memo-desk-outlook-reminder-minutes";
+const LEGACY_STORAGE_KEY = "note-desk-notes";
+const DISPLAY_SETTINGS_KEY = "note-desk-display-settings";
+const SORT_SETTING_KEY = "note-desk-sort-setting";
+const LOCAL_MODE_KEY = "note-desk-local-mode";
+const LOCAL_ENTRY_KEY = "note-desk-local-entry";
+const LOCAL_MEMOS_KEY = "note-desk-local-notes";
+const LOCAL_DISPLAY_NAME_KEY = "note-desk-local-display-name";
+const DRAFT_KEY = "note-desk-draft";
+const CUSTOM_COLORS_KEY = "note-desk-custom-colors";
+const LAYOUT_SETTING_KEY = "note-desk-layout-setting";
+const LAST_OPEN_MEMO_KEY = "note-desk-last-open-note";
+const OUTLOOK_REMINDER_SETTING_KEY = "note-desk-outlook-reminder-minutes";
+const AUTOSAVE_SETTING_KEY = "note-desk-autosave";
 
 const loginScreen = document.querySelector("#loginScreen");
 const appScreen = document.querySelector("#appScreen");
@@ -40,11 +41,19 @@ const titleInput = document.querySelector("#memoTitle");
 const bodyInput = document.querySelector("#memoBody");
 const tagsInput = document.querySelector("#memoTags");
 const tagSuggestList = document.querySelector("#tagSuggestList");
+const noteNotebookSelect = document.querySelector("#noteNotebook");
+const customNotebookInput = document.querySelector("#customNotebookInput");
+const noteTemplateSelect = document.querySelector("#noteTemplateSelect");
+const noteTypeSelect = document.querySelector("#noteTypeSelect");
+const attachmentInput = document.querySelector("#noteAttachmentInput");
+const attachmentList = document.querySelector("#attachmentList");
 const reminderInput = document.querySelector("#memoReminder");
 const autoTagButton = document.querySelector("#autoTagButton");
 const autoTagStatus = document.querySelector("#autoTagStatus");
 const searchInput = document.querySelector("#searchInput");
 const sortSelect = document.querySelector("#sortSelect");
+const notebookFilterSelect = document.querySelector("#notebookFilterSelect");
+const dateViewSelect = document.querySelector("#dateViewSelect");
 const memoList = document.querySelector("#memoList");
 const memoCount = document.querySelector("#memoCount");
 const tagFilterButton = document.querySelector("#tagFilterButton");
@@ -65,14 +74,22 @@ const memoDialog = document.querySelector("#memoDialog");
 const memoDialogTitle = document.querySelector("#memoDialogTitle");
 const memoDialogTime = document.querySelector("#memoDialogTime");
 const memoDialogBody = document.querySelector("#memoDialogBody");
+const memoDialogSearch = document.querySelector("#memoDialogSearch");
+const memoDialogSearchStatus = document.querySelector("#memoDialogSearchStatus");
+const memoDialogToc = document.querySelector("#memoDialogToc");
 const memoDialogSchedule = document.querySelector("#memoDialogSchedule");
 const memoDialogTags = document.querySelector("#memoDialogTags");
+const memoDialogAttachments = document.querySelector("#memoDialogAttachments");
 const memoDialogReminder = document.querySelector("#memoDialogReminder");
 const calendarDownloadStatus = document.querySelector("#calendarDownloadStatus");
 const memoDialogCloseButton = document.querySelector("#memoDialogCloseButton");
 const memoDialogPinButton = document.querySelector("#memoDialogPinButton");
 const memoDialogFavoriteButton = document.querySelector("#memoDialogFavoriteButton");
+const memoDialogDuplicateButton = document.querySelector("#memoDialogDuplicateButton");
+const memoDialogExportMdButton = document.querySelector("#memoDialogExportMdButton");
+const memoDialogExportTxtButton = document.querySelector("#memoDialogExportTxtButton");
 const memoDialogEditButton = document.querySelector("#memoDialogEditButton");
+const memoDialogArchiveButton = document.querySelector("#memoDialogArchiveButton");
 const memoDialogDeleteButton = document.querySelector("#memoDialogDeleteButton");
 const memoDialogOutlookButton = document.querySelector("#memoDialogOutlookButton");
 const settingsButton = document.querySelector("#settingsButton");
@@ -105,7 +122,13 @@ const TITLE_MAX_LENGTH = 120;
 const BODY_MAX_LENGTH = 10000;
 const TAG_MAX_COUNT = 10;
 const TAG_MAX_LENGTH = 24;
+const NOTEBOOK_MAX_LENGTH = 32;
+const DEFAULT_NOTEBOOK = "未分類";
+const DEFAULT_NOTEBOOKS = ["未分類", "仕事", "学習", "個人", "議事録", "アイデア", "タスク"];
+const NOTE_TYPES = new Set(["text", "checklist"]);
 const AUTO_TAG_LIMIT = 5;
+const ATTACHMENT_LIMIT = 3;
+const ATTACHMENT_MAX_BYTES = 220 * 1024;
 const OUTLOOK_EVENT_DURATION_MINUTES = 30;
 const OUTLOOK_EVENT_START_HOUR = 8;
 const DEFAULT_OUTLOOK_REMINDER_MINUTES = 15;
@@ -113,6 +136,45 @@ const OUTLOOK_REMINDER_OPTIONS = new Set([0, 5, 15, 30, 60, 1440]);
 const ICS_LINE_BYTE_LIMIT = 72;
 const DEFAULT_SORT_MODE = "updatedDesc";
 const SORT_MODES = new Set(["updatedDesc", "updatedAsc", "titleAsc", "titleDesc"]);
+const DEFAULT_DATE_VIEW = "active";
+const DATE_VIEW_MODES = new Set(["active", "all", "today", "week", "month", "reminder", "archive"]);
+const NOTE_TEMPLATES = {
+  meeting: {
+    title: "議事録",
+    notebook: "議事録",
+    type: "text",
+    tags: ["会議", "議事録"],
+    body: "# 会議概要\n- 日時:\n- 参加者:\n- 目的:\n\n## 決定事項\n- \n\n## ToDo\n- [ ] \n\n## 補足ノート\n",
+  },
+  daily: {
+    title: "日報",
+    notebook: "仕事",
+    type: "text",
+    tags: ["日報", "仕事"],
+    body: "# 今日やったこと\n- \n\n## 気づき\n- \n\n## 明日やること\n- [ ] \n",
+  },
+  todo: {
+    title: "ToDo",
+    notebook: "タスク",
+    type: "checklist",
+    tags: ["タスク"],
+    body: "# ToDo\n- [ ] \n- [ ] \n- [ ] \n",
+  },
+  idea: {
+    title: "アイデア",
+    notebook: "アイデア",
+    type: "text",
+    tags: ["アイデア"],
+    body: "# アイデア\n\n## きっかけ\n\n## 試したいこと\n- \n\n## 次の一手\n- [ ] \n",
+  },
+  study: {
+    title: "学習ノート",
+    notebook: "学習",
+    type: "text",
+    tags: ["学習"],
+    body: "# 学習ノート\n\n## 要点\n- \n\n## 疑問\n- \n\n## 復習チェック\n- [ ] \n",
+  },
+};
 const DEFAULT_LIGHT_COLORS = {
   accent: "#0f766e",
   bg: "#f7f5f0",
@@ -150,6 +212,7 @@ const AUTO_TAG_STOP_WORDS = new Set([
   "ため",
   "こと",
   "もの",
+  "ノート",
   "メモ",
   "memo",
   "the",
@@ -186,12 +249,16 @@ let memos = [];
 let dataMode = "cloud";
 let editingId = null;
 let activeTag = "all";
+let activeNotebook = "all";
+let dateViewMode = DEFAULT_DATE_VIEW;
 let emailAuthMode = "signin";
 let showFavoritesOnly = false;
 let openMemoId = null;
 let currentPage = 1;
 let sortMode = readSortMode();
 let hasTriedRestoreOpenMemo = false;
+let currentAttachments = [];
+let dialogSearchQuery = "";
 
 function readDisplaySettings() {
   try {
@@ -236,6 +303,311 @@ function applyCustomColors(colors) {
   if (bgColorInput) bgColorInput.value = colors.bg;
   if (textColorInput) textColorInput.value = colors.text;
   if (cardBgColorInput) cardBgColorInput.value = colors.cardBg;
+}
+
+function cleanNotebook(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, NOTEBOOK_MAX_LENGTH);
+}
+
+function getMemoNotebook(memo) {
+  return cleanNotebook(memo?.notebook) || DEFAULT_NOTEBOOK;
+}
+
+function getNotebookNames() {
+  const names = new Set(DEFAULT_NOTEBOOKS);
+  memos.forEach((memo) => names.add(getMemoNotebook(memo)));
+  const custom = cleanNotebook(customNotebookInput?.value);
+  if (custom) names.add(custom);
+  return [...names].filter(Boolean).sort((a, b) => {
+    if (a === DEFAULT_NOTEBOOK) return -1;
+    if (b === DEFAULT_NOTEBOOK) return 1;
+    return a.localeCompare(b, "ja-JP", { numeric: true, sensitivity: "base" });
+  });
+}
+
+function fillSelectOptions(select, values, selectedValue, allLabel = null) {
+  if (!select) return;
+  const previous = selectedValue ?? select.value;
+  select.innerHTML = "";
+  if (allLabel) {
+    const allOption = document.createElement("option");
+    allOption.value = "all";
+    allOption.textContent = allLabel;
+    select.append(allOption);
+  }
+  values.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.append(option);
+  });
+  select.value = [...select.options].some((option) => option.value === previous)
+    ? previous
+    : select.options[0]?.value || "";
+}
+
+function renderNotebookControls() {
+  const notebooks = getNotebookNames();
+  fillSelectOptions(noteNotebookSelect, notebooks, noteNotebookSelect?.value || DEFAULT_NOTEBOOK);
+  fillSelectOptions(notebookFilterSelect, notebooks, activeNotebook, "すべてのノートブック");
+}
+
+function getSelectedNotebook() {
+  const custom = cleanNotebook(customNotebookInput?.value);
+  if (custom) return custom;
+  return cleanNotebook(noteNotebookSelect?.value) || DEFAULT_NOTEBOOK;
+}
+
+function getSelectedNoteType() {
+  return NOTE_TYPES.has(noteTypeSelect?.value) ? noteTypeSelect.value : "text";
+}
+
+function normalizeAttachments(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === "object")
+    .slice(0, ATTACHMENT_LIMIT)
+    .map((item) => ({
+      id: item.id || crypto.randomUUID(),
+      name: String(item.name || "添付ファイル").slice(0, 120),
+      type: String(item.type || "application/octet-stream"),
+      size: Number(item.size) || 0,
+      dataUrl: String(item.dataUrl || ""),
+      createdAt: item.createdAt || new Date().toISOString(),
+    }))
+    .filter((item) => item.dataUrl);
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(reader.result));
+    reader.addEventListener("error", () => reject(reader.error));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function addAttachmentsFromFiles(files) {
+  if (!files?.length) return;
+  const remaining = ATTACHMENT_LIMIT - currentAttachments.length;
+  if (remaining <= 0) {
+    showFormError(`添付は${ATTACHMENT_LIMIT}件までです。`);
+    return;
+  }
+
+  const nextFiles = [...files].slice(0, remaining);
+  for (const file of nextFiles) {
+    if (file.size > ATTACHMENT_MAX_BYTES) {
+      showFormError(`「${file.name}」は大きすぎます。1ファイル${Math.round(ATTACHMENT_MAX_BYTES / 1024)}KB以内にしてください。`);
+      continue;
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      currentAttachments.push({
+        id: crypto.randomUUID(),
+        name: file.name,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+        dataUrl,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(error);
+      showFormError(`「${file.name}」の読み込みに失敗しました。`);
+    }
+  }
+  renderAttachmentList();
+}
+
+function renderAttachmentList(target = attachmentList, attachments = currentAttachments, editable = true) {
+  if (!target) return;
+  target.innerHTML = "";
+  if (!attachments.length) {
+    target.hidden = true;
+    return;
+  }
+  target.hidden = false;
+  attachments.forEach((attachment) => {
+    const item = document.createElement("div");
+    item.className = "attachment-item";
+
+    if (attachment.type.startsWith("image/")) {
+      const img = document.createElement("img");
+      img.src = attachment.dataUrl;
+      img.alt = attachment.name;
+      item.append(img);
+    } else {
+      const icon = document.createElement("span");
+      icon.className = "attachment-icon";
+      icon.textContent = "FILE";
+      item.append(icon);
+    }
+
+    const link = document.createElement("a");
+    link.href = attachment.dataUrl;
+    link.download = attachment.name;
+    link.textContent = attachment.name;
+
+    const meta = document.createElement("span");
+    meta.textContent = formatFileSize(attachment.size);
+
+    const text = document.createElement("div");
+    text.append(link, meta);
+    item.append(text);
+
+    if (editable) {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "secondary icon-button attachment-remove";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", `${attachment.name}を外す`);
+      remove.addEventListener("click", () => {
+        currentAttachments = currentAttachments.filter((item) => item.id !== attachment.id);
+        renderAttachmentList();
+      });
+      item.append(remove);
+    }
+
+    target.append(item);
+  });
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightEscapedText(value, query) {
+  if (!query) return value;
+  const pattern = new RegExp(`(${escapeRegExp(escapeHtml(query))})`, "gi");
+  return value.replace(pattern, "<mark>$1</mark>");
+}
+
+function countTextMatches(text, query) {
+  if (!query) return 0;
+  const matches = String(text || "").match(new RegExp(escapeRegExp(query), "gi"));
+  return matches?.length || 0;
+}
+
+function slugHeading(text, index) {
+  const base = String(text || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  return `note-heading-${base || "section"}-${index}`;
+}
+
+function extractHeadings(body) {
+  let index = 0;
+  return String(body || "")
+    .split(/\r?\n/)
+    .map((line) => {
+      const match = line.match(/^(#{1,3})\s+(.+)$/);
+      if (!match) return null;
+      index += 1;
+      return {
+        id: slugHeading(match[2], index),
+        level: match[1].length,
+        text: match[2].trim(),
+      };
+    })
+    .filter(Boolean);
+}
+
+function renderInlineMarkdown(text, query = "") {
+  let output = highlightEscapedText(escapeHtml(text), query);
+  output = output.replace(/`([^`]+)`/g, "<code>$1</code>");
+  output = output.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  output = output.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  output = output.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  return output;
+}
+
+function renderMarkdown(body, options = {}) {
+  const query = options.query || "";
+  const lines = String(body || "").split(/\r?\n/);
+  let headingIndex = 0;
+  let inList = false;
+
+  const closeList = () => {
+    if (!inList) return "";
+    inList = false;
+    return "</ul>";
+  };
+
+  const html = lines.map((line) => {
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      headingIndex += 1;
+      const level = Math.min(heading[1].length + 2, 5);
+      const id = slugHeading(heading[2], headingIndex);
+      return `${closeList()}<h${level} id="${id}">${renderInlineMarkdown(heading[2], query)}</h${level}>`;
+    }
+
+    const checklist = line.match(/^\s*[-*]\s+\[( |x|X)\]\s+(.+)$/);
+    if (checklist) {
+      const checked = checklist[1].toLowerCase() === "x";
+      return `${closeList()}<div class="rendered-check"><input type="checkbox" disabled ${checked ? "checked" : ""}><span>${renderInlineMarkdown(checklist[2], query)}</span></div>`;
+    }
+
+    const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+    if (bullet) {
+      const open = inList ? "" : "<ul>";
+      inList = true;
+      return `${open}<li>${renderInlineMarkdown(bullet[1], query)}</li>`;
+    }
+
+    if (!line.trim()) return `${closeList()}<br>`;
+    return `${closeList()}<p>${renderInlineMarkdown(line, query)}</p>`;
+  }).join("");
+
+  return `${html}${closeList()}`;
+}
+
+function renderDialogToc(memo) {
+  if (!memoDialogToc) return;
+  const headings = extractHeadings(memo.body);
+  memoDialogToc.innerHTML = "";
+  memoDialogToc.hidden = headings.length === 0;
+  headings.forEach((heading) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `toc-link level-${heading.level}`;
+    button.textContent = heading.text;
+    button.addEventListener("click", () => {
+      memoDialogBody?.querySelector(`#${CSS.escape(heading.id)}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+    memoDialogToc.append(button);
+  });
+}
+
+function renderDialogBody(memo) {
+  if (!memoDialogBody) return;
+  memoDialogBody.innerHTML = renderMarkdown(memo.body, { query: dialogSearchQuery });
+  renderDialogToc(memo);
+  if (memoDialogSearchStatus) {
+    const count = countTextMatches(memo.body, dialogSearchQuery);
+    memoDialogSearchStatus.textContent = dialogSearchQuery ? `${count}件` : "";
+  }
 }
 
 function getPopularTags() {
@@ -538,7 +910,7 @@ function sanitizeFileName(value) {
     .replace(/[\\/:*?"<>|]+/g, "_")
     .replace(/\s+/g, "_")
     .slice(0, 60);
-  return cleaned || "memo-reminder";
+  return cleaned || "note-reminder";
 }
 
 function toOutlookEventStart(value) {
@@ -560,7 +932,7 @@ function buildOutlookIcs(memo) {
   if (!start) return "";
 
   const end = new Date(start.getTime() + OUTLOOK_EVENT_DURATION_MINUTES * 60 * 1000);
-  const title = memo.title?.trim() || "Memo Desk リマインダー";
+  const title = memo.title?.trim() || "NoteDesk リマインダー";
   const description = [
     memo.body?.trim(),
     memo.tags?.length ? `タグ: ${memo.tags.join(", ")}` : "",
@@ -569,11 +941,11 @@ function buildOutlookIcs(memo) {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Memo Desk//Memo Reminder//JA",
+    "PRODID:-//NoteDesk//Note Reminder//JA",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
-    `UID:memo-desk-${memo.id || crypto.randomUUID()}@memo-desk.local`,
+    `UID:note-desk-${memo.id || crypto.randomUUID()}@note-desk.local`,
     `DTSTAMP:${formatIcsDate(new Date())}`,
     `DTSTART:${formatIcsDate(start)}`,
     `DTEND:${formatIcsDate(end)}`,
@@ -759,11 +1131,11 @@ function disableLocalOnlyEntry() {
 }
 
 function memosCollectionRef(uid) {
-  return collection(db, "users", uid, "memos");
+  return collection(db, "users", uid, "notes");
 }
 
 function memoDocRef(uid, memoId) {
-  return doc(db, "users", uid, "memos", memoId);
+  return doc(db, "users", uid, "notes", memoId);
 }
 
 function showLoginError(message) {
@@ -811,6 +1183,10 @@ function normalizeMemo(data, fallbackId = crypto.randomUUID()) {
     title: data?.title ?? "",
     body: data?.body ?? "",
     tags: Array.isArray(data?.tags) ? data.tags : [],
+    notebook: cleanNotebook(data?.notebook) || DEFAULT_NOTEBOOK,
+    type: NOTE_TYPES.has(data?.type) ? data.type : "text",
+    archived: Boolean(data?.archived),
+    attachments: normalizeAttachments(data?.attachments),
     reminderAt: normalizeReminderAt(data?.reminderAt),
     updatedAt: data?.updatedAt ?? new Date().toISOString(),
     favorite: Boolean(data?.favorite),
@@ -948,6 +1324,10 @@ function startMemoSubscription(user) {
           title: data.title ?? "",
           body: data.body ?? "",
           tags: Array.isArray(data.tags) ? data.tags : [],
+          notebook: cleanNotebook(data.notebook) || DEFAULT_NOTEBOOK,
+          type: NOTE_TYPES.has(data.type) ? data.type : "text",
+          archived: Boolean(data.archived),
+          attachments: normalizeAttachments(data.attachments),
           reminderAt: normalizeReminderAt(data.reminderAt),
           updatedAt: data.updatedAt ?? new Date().toISOString(),
           favorite: Boolean(data.favorite),
@@ -960,13 +1340,13 @@ function startMemoSubscription(user) {
     (error) => {
       console.error(error);
       setAppLoading(false);
-      showFormError("メモの読み込みに失敗しました。Firestore の設定を確認してください。");
+      showFormError("ノートの読み込みに失敗しました。Firestore の設定を確認してください。");
     },
   );
 }
 
 async function migrateLocalMemosIfNeeded(uid) {
-  const keys = [LEGACY_STORAGE_KEY, `memo-desk-notes-${uid}`];
+  const keys = [LEGACY_STORAGE_KEY, `note-desk-notes-${uid}`];
   let localMemos = [];
 
   for (const key of keys) {
@@ -995,6 +1375,10 @@ async function migrateLocalMemosIfNeeded(uid) {
       title: memo.title ?? "",
       body: memo.body ?? "",
       tags: Array.isArray(memo.tags) ? memo.tags : [],
+      notebook: cleanNotebook(memo.notebook) || DEFAULT_NOTEBOOK,
+      type: NOTE_TYPES.has(memo.type) ? memo.type : "text",
+      archived: Boolean(memo.archived),
+      attachments: normalizeAttachments(memo.attachments),
       reminderAt: normalizeReminderAt(memo.reminderAt),
       updatedAt: memo.updatedAt ?? new Date().toISOString(),
       favorite: Boolean(memo.favorite),
@@ -1011,6 +1395,8 @@ async function enterApp(user) {
   updateUserDisplay(user);
   editingId = null;
   activeTag = "all";
+  activeNotebook = "all";
+  dateViewMode = DEFAULT_DATE_VIEW;
   showFavoritesOnly = false;
   resetOpenMemoRestore();
   resetPagination();
@@ -1025,7 +1411,7 @@ async function enterApp(user) {
   } catch (error) {
     console.error(error);
     setAppLoading(false);
-    showFormError("メモの準備に失敗しました。");
+    showFormError("ノートの準備に失敗しました。");
   }
 }
 
@@ -1040,6 +1426,8 @@ function enterLocalApp() {
   if (logoutButton) logoutButton.textContent = useLocalOnlyEntry() ? "ログイン画面に戻る" : "モード選択へ";
   editingId = null;
   activeTag = "all";
+  activeNotebook = "all";
+  dateViewMode = DEFAULT_DATE_VIEW;
   showFavoritesOnly = false;
   resetOpenMemoRestore();
   resetPagination();
@@ -1192,6 +1580,56 @@ function parseTags(text) {
     .filter(Boolean);
 }
 
+function insertMarkdown(action) {
+  if (!bodyInput) return;
+  const start = bodyInput.selectionStart ?? bodyInput.value.length;
+  const end = bodyInput.selectionEnd ?? start;
+  const selected = bodyInput.value.slice(start, end);
+  const presets = {
+    heading: `## ${selected || "見出し"}`,
+    bold: `**${selected || "強調したい言葉"}**`,
+    bullet: `- ${selected || "箇条書き"}`,
+    check: `- [ ] ${selected || "チェック項目"}`,
+    link: `[${selected || "リンク"}](https://example.com)`,
+  };
+  const insertText = presets[action];
+  if (!insertText) return;
+  bodyInput.setRangeText(insertText, start, end, "end");
+  bodyInput.focus();
+  bodyInput.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function mergeTags(existingText, nextTags) {
+  const tags = parseTags(existingText);
+  nextTags.forEach((tag) => {
+    if (!tags.some((item) => item.toLowerCase() === tag.toLowerCase()) && tags.length < TAG_MAX_COUNT) {
+      tags.push(tag);
+    }
+  });
+  return tags.join(", ");
+}
+
+function applyTemplate(templateId) {
+  const template = NOTE_TEMPLATES[templateId];
+  if (!template) return;
+
+  if (!titleInput.value.trim()) {
+    titleInput.value = template.title;
+  }
+  if (!bodyInput.value.trim()) {
+    bodyInput.value = template.body;
+  } else {
+    bodyInput.value = `${bodyInput.value.trimEnd()}\n\n${template.body}`;
+  }
+  if (tagsInput) tagsInput.value = mergeTags(tagsInput.value, template.tags);
+  renderNotebookControls();
+  if (noteNotebookSelect) noteNotebookSelect.value = template.notebook;
+  if (customNotebookInput) customNotebookInput.value = "";
+  if (noteTypeSelect) noteTypeSelect.value = template.type;
+  titleInput.dispatchEvent(new Event("input", { bubbles: true }));
+  bodyInput.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 function validateMemoInput(title, body, tags) {
   if (!title) {
     return { message: "タイトルを入力してください。", target: titleInput };
@@ -1218,6 +1656,11 @@ function validateMemoInput(title, body, tags) {
     return { message: `タグは1つ${TAG_MAX_LENGTH}文字以内にしてください。`, target: tagsInput };
   }
 
+  const notebook = getSelectedNotebook();
+  if (notebook.length > NOTEBOOK_MAX_LENGTH) {
+    return { message: `ノートブック名は${NOTEBOOK_MAX_LENGTH}文字以内にしてください。`, target: customNotebookInput || noteNotebookSelect };
+  }
+
   return null;
 }
 
@@ -1230,18 +1673,50 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function startOfLocalDay(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function matchesDateView(memo) {
+  if (dateViewMode === "all") return true;
+  if (dateViewMode === "archive") return Boolean(memo.archived);
+  if (memo.archived) return false;
+  if (dateViewMode === "active") return true;
+  if (dateViewMode === "reminder") return Boolean(toReminderDate(memo.reminderAt));
+
+  const updated = new Date(memo.updatedAt);
+  const today = startOfLocalDay();
+  const noteDay = startOfLocalDay(updated);
+  if (dateViewMode === "today") return noteDay.getTime() === today.getTime();
+  if (dateViewMode === "week") {
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+    return noteDay >= weekStart && noteDay < weekEnd;
+  }
+  if (dateViewMode === "month") {
+    return updated.getFullYear() === today.getFullYear() && updated.getMonth() === today.getMonth();
+  }
+  return true;
+}
+
 function getFilteredMemos() {
   const keyword = searchInput.value.trim().toLowerCase();
 
   return memos.filter((memo) => {
+    const attachmentText = normalizeAttachments(memo.attachments).map((file) => file.name).join(" ");
     const matchesKeyword =
       memo.title.toLowerCase().includes(keyword) ||
       memo.body.toLowerCase().includes(keyword) ||
       memo.tags.some((tag) => tag.toLowerCase().includes(keyword)) ||
+      getMemoNotebook(memo).toLowerCase().includes(keyword) ||
+      attachmentText.toLowerCase().includes(keyword) ||
       formatReminderDate(memo.reminderAt).toLowerCase().includes(keyword);
     const matchesTag = activeTag === "all" || memo.tags.includes(activeTag);
+    const matchesNotebook = activeNotebook === "all" || getMemoNotebook(memo) === activeNotebook;
     const matchesFavorite = !showFavoritesOnly || memo.favorite;
-    return matchesKeyword && matchesTag && matchesFavorite;
+    return matchesKeyword && matchesTag && matchesNotebook && matchesFavorite && matchesDateView(memo);
   });
 }
 
@@ -1260,6 +1735,7 @@ function renderFavoriteFilter() {
 
 function renderSortControl() {
   if (sortSelect) sortSelect.value = SORT_MODES.has(sortMode) ? sortMode : DEFAULT_SORT_MODE;
+  if (dateViewSelect) dateViewSelect.value = DATE_VIEW_MODES.has(dateViewMode) ? dateViewMode : DEFAULT_DATE_VIEW;
 }
 
 function renderPagination(totalItems) {
@@ -1311,7 +1787,7 @@ function renderTags() {
   }
   if (tagFilterStatus) {
     tagFilterStatus.textContent =
-      activeTag === "all" ? "すべてのメモを表示中" : `「${activeTag}」で絞り込み中`;
+      activeTag === "all" ? "すべてのノートを表示中" : `「${activeTag}」で絞り込み中`;
   }
 
   const allButton = document.createElement("button");
@@ -1368,13 +1844,13 @@ function renderMemos() {
   const pageMemos = filteredMemos.slice(startIndex, startIndex + MEMOS_PER_PAGE);
 
   memoList.innerHTML = "";
-  memoCount.textContent = `${memos.length}件`;
+  memoCount.textContent = `${filteredMemos.length}件`;
   if (openMemoId) updateMemoDialog(openMemoId);
 
   if (pageMemos.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty";
-    empty.textContent = appLoading.hidden === false ? "読み込み中…" : "表示できるメモがありません";
+    empty.textContent = appLoading.hidden === false ? "読み込み中…" : "表示できるノートがありません";
     memoList.append(empty);
     renderPagination(filteredMemos.length);
     return;
@@ -1387,11 +1863,17 @@ function renderMemos() {
     const time = item.querySelector("time");
     const body = item.querySelector(".memo-body");
     const tags = item.querySelector(".memo-tags");
+    const notebookChip = item.querySelector(".notebook-chip");
+    const noteTypeChip = item.querySelector(".note-type-chip");
+    const attachmentSummary = item.querySelector(".attachment-summary");
     const reminder = getOrCreateCardReminder(card);
     const pinButton = item.querySelector(".pin-button");
     const favoriteButton = item.querySelector(".favorite-button");
     const openButton = item.querySelector(".open-button");
     const editButton = item.querySelector(".edit-button");
+    const duplicateButton = item.querySelector(".duplicate-button");
+    const exportButton = item.querySelector(".export-button");
+    const archiveButton = item.querySelector(".archive-button");
     const deleteButton = item.querySelector(".delete-button");
     const isFavorite = Boolean(memo.favorite);
     const isPinned = Boolean(memo.pinned);
@@ -1399,7 +1881,14 @@ function renderMemos() {
     title.textContent = memo.title;
     time.textContent = formatDate(memo.updatedAt);
     time.dateTime = memo.updatedAt;
-    body.textContent = memo.body;
+    body.innerHTML = renderMarkdown(memo.body);
+    if (notebookChip) notebookChip.textContent = getMemoNotebook(memo);
+    if (noteTypeChip) noteTypeChip.textContent = memo.type === "checklist" ? "チェックリスト" : "ノート";
+    const attachments = normalizeAttachments(memo.attachments);
+    if (attachmentSummary) {
+      attachmentSummary.hidden = attachments.length === 0;
+      attachmentSummary.textContent = attachments.length ? `添付 ${attachments.length}件` : "";
+    }
     const reminderText = formatReminderDate(memo.reminderAt);
     if (reminder) {
       reminder.hidden = !reminderText;
@@ -1408,6 +1897,7 @@ function renderMemos() {
     }
     card.classList.toggle("is-pinned", isPinned);
     card.classList.toggle("is-favorite", isFavorite);
+    card.classList.toggle("is-archived", Boolean(memo.archived));
     pinButton.textContent = isPinned ? "固定中" : "ピン";
     pinButton.setAttribute("aria-pressed", String(isPinned));
     pinButton.setAttribute("aria-label", isPinned ? "ピン留めを外す" : "ピン留めする");
@@ -1426,6 +1916,10 @@ function renderMemos() {
     pinButton.addEventListener("click", () => togglePinnedMemo(memo.id));
     favoriteButton.addEventListener("click", () => toggleFavoriteMemo(memo.id));
     editButton.addEventListener("click", () => startEditing(memo.id));
+    duplicateButton?.addEventListener("click", () => duplicateMemo(memo.id));
+    exportButton?.addEventListener("click", () => exportMemo(memo.id, "md"));
+    archiveButton?.addEventListener("click", () => toggleArchivedMemo(memo.id));
+    if (archiveButton) archiveButton.textContent = memo.archived ? "戻す" : "保管";
     deleteButton.addEventListener("click", () => deleteMemo(memo.id));
     card.addEventListener("dblclick", () => openMemoDialog(memo.id));
     memoList.append(card);
@@ -1453,6 +1947,7 @@ function getOrCreateCardReminder(card) {
 }
 
 function render() {
+  renderNotebookControls();
   renderFavoriteFilter();
   renderSortControl();
   renderTags();
@@ -1463,7 +1958,14 @@ function render() {
 function resetForm() {
   form.reset();
   editingId = null;
-  saveButton.textContent = "保存する";
+  currentAttachments = [];
+  if (noteTypeSelect) noteTypeSelect.value = "text";
+  if (customNotebookInput) customNotebookInput.value = "";
+  if (noteTemplateSelect) noteTemplateSelect.value = "";
+  renderNotebookControls();
+  if (noteNotebookSelect) noteNotebookSelect.value = DEFAULT_NOTEBOOK;
+  renderAttachmentList();
+  saveButton.textContent = "ノートを保存";
   clearFormError();
   hideAutoTagStatus();
   hideTagSuggestions();
@@ -1476,16 +1978,32 @@ function startEditing(id) {
 
   closeMemoDialog();
   editingId = id;
+  renderNotebookControls();
   titleInput.value = memo.title;
   bodyInput.value = memo.body;
   tagsInput.value = memo.tags.join(", ");
+  if (noteNotebookSelect) noteNotebookSelect.value = getMemoNotebook(memo);
+  if (customNotebookInput) customNotebookInput.value = "";
+  if (noteTypeSelect) noteTypeSelect.value = memo.type === "checklist" ? "checklist" : "text";
+  currentAttachments = normalizeAttachments(memo.attachments);
+  renderAttachmentList();
   if (reminderInput) reminderInput.value = toDatetimeLocalValue(memo.reminderAt);
-  saveButton.textContent = "更新する";
+  saveButton.textContent = "ノートを更新";
   titleInput.focus();
 }
 
 function renderDialogTags(memo) {
   memoDialogTags.innerHTML = "";
+
+  const notebookItem = document.createElement("span");
+  notebookItem.className = "notebook-chip";
+  notebookItem.textContent = getMemoNotebook(memo);
+  memoDialogTags.append(notebookItem);
+
+  const typeItem = document.createElement("span");
+  typeItem.className = "note-type-chip";
+  typeItem.textContent = memo.type === "checklist" ? "チェックリスト" : "ノート";
+  memoDialogTags.append(typeItem);
 
   memo.tags.forEach((tag) => {
     const tagItem = document.createElement("span");
@@ -1674,11 +2192,16 @@ function updateMemoDialog(id) {
   memoDialogTitle.textContent = memo.title;
   memoDialogTime.textContent = formatDate(memo.updatedAt);
   memoDialogTime.dateTime = memo.updatedAt;
-  memoDialogBody.textContent = memo.body;
+  renderDialogBody(memo);
   memoDialogPinButton.textContent = isPinned ? "ピン留め解除" : "ピン留め";
   memoDialogPinButton.setAttribute("aria-pressed", String(isPinned));
   memoDialogFavoriteButton.textContent = isFavorite ? "お気に入り解除" : "お気に入り";
   memoDialogFavoriteButton.setAttribute("aria-pressed", String(isFavorite));
+  if (memoDialogArchiveButton) {
+    memoDialogArchiveButton.textContent = memo.archived ? "アーカイブ解除" : "アーカイブ";
+    memoDialogArchiveButton.setAttribute("aria-pressed", String(Boolean(memo.archived)));
+  }
+  renderAttachmentList(memoDialogAttachments, normalizeAttachments(memo.attachments), false);
   renderDialogTags(memo);
   renderDialogReminder(memo);
   renderDialogOutlookButton(memo);
@@ -1689,6 +2212,8 @@ function openMemoDialog(id) {
   if (!memoDialog) return;
 
   openMemoId = id;
+  dialogSearchQuery = "";
+  if (memoDialogSearch) memoDialogSearch.value = "";
   rememberOpenMemo(id);
   memoDialog.hidden = false;
   document.body.classList.add("dialog-open");
@@ -1773,6 +2298,10 @@ async function saveMemo(memo) {
     title: memo.title,
     body: memo.body,
     tags: memo.tags,
+    notebook: getMemoNotebook(memo),
+    type: NOTE_TYPES.has(memo.type) ? memo.type : "text",
+    archived: Boolean(memo.archived),
+    attachments: normalizeAttachments(memo.attachments),
     reminderAt: normalizeReminderAt(memo.reminderAt),
     updatedAt: memo.updatedAt,
     favorite: memo.favorite,
@@ -1785,6 +2314,10 @@ function memoWriteData(memo, changes = {}) {
     title: memo.title,
     body: memo.body,
     tags: memo.tags,
+    notebook: getMemoNotebook(memo),
+    type: NOTE_TYPES.has(memo.type) ? memo.type : "text",
+    archived: Boolean(memo.archived),
+    attachments: normalizeAttachments(memo.attachments),
     reminderAt: normalizeReminderAt(memo.reminderAt),
     updatedAt: memo.updatedAt,
     favorite: Boolean(memo.favorite),
@@ -1835,6 +2368,116 @@ async function toggleFavoriteMemo(id) {
     console.error(error);
     showFormError("お気に入りの変更に失敗しました。");
   }
+}
+
+async function toggleArchivedMemo(id) {
+  const memo = memos.find((item) => item.id === id);
+  if (!memo || !currentUser) return;
+
+  try {
+    if (dataMode === "local") {
+      memo.archived = !memo.archived;
+      memo.updatedAt = new Date().toISOString();
+      saveLocalMemos();
+      if (memo.archived && openMemoId === id && dateViewMode !== "archive" && dateViewMode !== "all") closeMemoDialog();
+      render();
+    } else {
+      await setDoc(
+        memoDocRef(currentUser.uid, id),
+        memoWriteData(memo, {
+          archived: !memo.archived,
+          updatedAt: new Date().toISOString(),
+        }),
+        { merge: true },
+      );
+    }
+  } catch (error) {
+    console.error(error);
+    showFormError("アーカイブの変更に失敗しました。");
+  }
+}
+
+async function duplicateMemo(id) {
+  const memo = memos.find((item) => item.id === id);
+  if (!memo || !currentUser) return;
+
+  const copy = normalizeMemo({
+    ...memo,
+    id: crypto.randomUUID(),
+    title: `${memo.title} コピー`,
+    pinned: false,
+    archived: false,
+    updatedAt: new Date().toISOString(),
+    attachments: normalizeAttachments(memo.attachments).map((attachment) => ({
+      ...attachment,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    })),
+  });
+
+  try {
+    await saveMemo(copy);
+    resetPagination();
+    render();
+  } catch (error) {
+    console.error(error);
+    showFormError("ノートの複製に失敗しました。");
+  }
+}
+
+function buildMarkdownExport(memo) {
+  const attachments = normalizeAttachments(memo.attachments);
+  const lines = [
+    `# ${memo.title || "無題のノート"}`,
+    "",
+    `- ノートブック: ${getMemoNotebook(memo)}`,
+    `- 更新日: ${formatDate(memo.updatedAt)}`,
+    memo.tags?.length ? `- タグ: ${memo.tags.join(", ")}` : "- タグ: なし",
+    memo.reminderAt ? `- リマインダー: ${formatReminderDate(memo.reminderAt)}` : "- リマインダー: なし",
+    attachments.length ? `- 添付: ${attachments.map((item) => item.name).join(", ")}` : "- 添付: なし",
+    "",
+    "---",
+    "",
+    memo.body || "",
+  ];
+  return lines.join("\n");
+}
+
+function stripMarkdown(text) {
+  return String(text || "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)")
+    .replace(/^\s*[-*]\s+\[( |x|X)\]\s+/gm, "- ");
+}
+
+function buildTextExport(memo) {
+  return stripMarkdown(buildMarkdownExport(memo));
+}
+
+function downloadTextFile(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportMemo(id, format = "md") {
+  const memo = memos.find((item) => item.id === id);
+  if (!memo) return;
+  const baseName = sanitizeFileName(memo.title || "note");
+  if (format === "txt") {
+    downloadTextFile(`${baseName}.txt`, buildTextExport(memo), "text/plain;charset=utf-8");
+    return;
+  }
+  downloadTextFile(`${baseName}.md`, buildMarkdownExport(memo), "text/markdown;charset=utf-8");
 }
 
 async function initFirebase() {
@@ -1936,6 +2579,8 @@ function bindMemoPage() {
       tags = applyAutoTags({ silent: true, onlyWhenEmpty: true });
     }
     const existingMemo = memos.find((item) => item.id === editingId);
+    const notebook = getSelectedNotebook();
+    const type = getSelectedNoteType();
     const reminderAt = reminderInput
       ? normalizeReminderAt(reminderInput.value)
       : normalizeReminderAt(existingMemo?.reminderAt);
@@ -1952,6 +2597,10 @@ function bindMemoPage() {
       title,
       body,
       tags,
+      notebook,
+      type,
+      archived: existingMemo?.archived ?? false,
+      attachments: normalizeAttachments(currentAttachments),
       reminderAt,
       updatedAt: new Date().toISOString(),
       favorite: existingMemo?.favorite ?? false,
@@ -1975,7 +2624,7 @@ function bindMemoPage() {
     }
   });
 
-  [titleInput, bodyInput, usernameInput, reminderInput].forEach((input) => {
+  [titleInput, bodyInput, usernameInput, reminderInput, customNotebookInput].forEach((input) => {
     input?.addEventListener("input", clearFormError);
   });
 
@@ -1989,10 +2638,31 @@ function bindMemoPage() {
     resetPagination();
     renderMemos();
   });
+  notebookFilterSelect?.addEventListener("change", () => {
+    activeNotebook = notebookFilterSelect.value || "all";
+    resetPagination();
+    render();
+  });
+  dateViewSelect?.addEventListener("change", () => {
+    dateViewMode = DATE_VIEW_MODES.has(dateViewSelect.value) ? dateViewSelect.value : DEFAULT_DATE_VIEW;
+    resetPagination();
+    render();
+  });
   favoriteFilterButton.addEventListener("click", () => {
     showFavoritesOnly = !showFavoritesOnly;
     resetPagination();
     render();
+  });
+  customNotebookInput?.addEventListener("input", renderNotebookControls);
+  noteTemplateSelect?.addEventListener("change", () => {
+    applyTemplate(noteTemplateSelect.value);
+  });
+  attachmentInput?.addEventListener("change", async () => {
+    await addAttachmentsFromFiles(attachmentInput.files);
+    attachmentInput.value = "";
+  });
+  document.querySelectorAll("[data-markdown-action]").forEach((button) => {
+    button.addEventListener("click", () => insertMarkdown(button.dataset.markdownAction));
   });
   tagFilterButton?.addEventListener("click", openTagFilterDialog);
   tagFilterDialogCloseButton?.addEventListener("click", closeTagFilterDialog);
@@ -2101,12 +2771,28 @@ function bindMemoPage() {
   memoDialogPinButton.addEventListener("click", () => {
     if (openMemoId) togglePinnedMemo(openMemoId);
   });
+  memoDialogSearch?.addEventListener("input", () => {
+    dialogSearchQuery = memoDialogSearch.value.trim();
+    if (openMemoId) updateMemoDialog(openMemoId);
+  });
   getOrCreateDialogOutlookButton()?.addEventListener("click", () => {
     const memo = memos.find((item) => item.id === openMemoId);
     if (memo && downloadOutlookIcs(memo)) showCalendarDownloadStatus();
   });
+  memoDialogDuplicateButton?.addEventListener("click", () => {
+    if (openMemoId) duplicateMemo(openMemoId);
+  });
+  memoDialogExportMdButton?.addEventListener("click", () => {
+    if (openMemoId) exportMemo(openMemoId, "md");
+  });
+  memoDialogExportTxtButton?.addEventListener("click", () => {
+    if (openMemoId) exportMemo(openMemoId, "txt");
+  });
   memoDialogEditButton.addEventListener("click", () => {
     if (openMemoId) startEditing(openMemoId);
+  });
+  memoDialogArchiveButton?.addEventListener("click", () => {
+    if (openMemoId) toggleArchivedMemo(openMemoId);
   });
   memoDialogDeleteButton.addEventListener("click", () => {
     if (openMemoId) deleteMemo(openMemoId);
@@ -2138,11 +2824,11 @@ function bindMemoPage() {
 
   // Initialize auto-save toggle and behavior
   try {
-    const savedAuto = localStorage.getItem("memo-desk-autosave");
+    const savedAuto = localStorage.getItem(AUTOSAVE_SETTING_KEY);
     if (autoSaveToggle) autoSaveToggle.checked = savedAuto === "true";
     autoSaveToggle?.addEventListener("change", () => {
       const enabled = autoSaveToggle.checked;
-      localStorage.setItem("memo-desk-autosave", enabled ? "true" : "false");
+      localStorage.setItem(AUTOSAVE_SETTING_KEY, enabled ? "true" : "false");
       if (enabled) {
         startAutoSave();
         attachDraftInputHandlers();
@@ -2221,7 +2907,7 @@ function bindMemoPage() {
   if (settingsClearLocalButton) {
     settingsClearLocalButton.addEventListener("click", () => {
       if (!confirmDialog || !confirmDialogMessage) return;
-      confirmDialogMessage.textContent = 'このブラウザに保存されたローカルデータを削除します。よろしいですか？';
+      confirmDialogMessage.textContent = 'このブラウザに保存されたローカルノートを削除します。よろしいですか？';
       confirmAction = async () => {
         try {
           localStorage.removeItem(LOCAL_MEMOS_KEY);
@@ -2229,10 +2915,10 @@ function bindMemoPage() {
           localStorage.removeItem(DRAFT_KEY);
           memos = loadLocalMemos();
           render();
-          alert('ローカルデータを削除しました。');
+          alert('ローカルノートを削除しました。');
         } catch (error) {
           console.error(error);
-          alert('ローカルデータの削除に失敗しました。コンソールを確認してください。');
+          alert('ローカルノートの削除に失敗しました。コンソールを確認してください。');
         }
       };
       confirmDialog.hidden = false;
@@ -2292,6 +2978,8 @@ function createDraftSnapshot() {
     title: titleInput.value || "",
     body: bodyInput.value || "",
     tags: tagsInput.value || "",
+    notebook: getSelectedNotebook(),
+    type: getSelectedNoteType(),
     reminderAt: reminderInput?.value || "",
     updatedAt: new Date().toISOString(),
   };
@@ -2325,14 +3013,16 @@ function attachDraftInputHandlers() {
   draftInputHandler = function () {
     saveDraft();
   };
-  [titleInput, bodyInput, tagsInput, reminderInput].forEach((el) => {
+  [titleInput, bodyInput, tagsInput, reminderInput, noteNotebookSelect, customNotebookInput, noteTypeSelect].forEach((el) => {
     el?.addEventListener('input', draftInputHandler);
+    el?.addEventListener('change', draftInputHandler);
   });
 }
 
 function detachDraftInputHandlers() {
-  [titleInput, bodyInput, tagsInput, reminderInput].forEach((el) => {
+  [titleInput, bodyInput, tagsInput, reminderInput, noteNotebookSelect, customNotebookInput, noteTypeSelect].forEach((el) => {
     if (draftInputHandler) el?.removeEventListener('input', draftInputHandler);
+    if (draftInputHandler) el?.removeEventListener('change', draftInputHandler);
   });
   draftInputHandler = null;
 }
@@ -2357,7 +3047,7 @@ function clearDraft() {
 function tryRestoreDraftOnLoad() {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
-    const autosaveEnabled = localStorage.getItem('memo-desk-autosave') === 'true';
+    const autosaveEnabled = localStorage.getItem(AUTOSAVE_SETTING_KEY) === 'true';
     if (!raw || !autosaveEnabled) return;
     const draft = JSON.parse(raw);
     if (!draft) return;
@@ -2368,8 +3058,12 @@ function tryRestoreDraftOnLoad() {
     titleInput.value = draft.title || '';
     bodyInput.value = draft.body || '';
     tagsInput.value = draft.tags || '';
+    renderNotebookControls();
+    if (noteNotebookSelect) noteNotebookSelect.value = cleanNotebook(draft.notebook) || DEFAULT_NOTEBOOK;
+    if (customNotebookInput) customNotebookInput.value = "";
+    if (noteTypeSelect) noteTypeSelect.value = NOTE_TYPES.has(draft.type) ? draft.type : "text";
     if (reminderInput) reminderInput.value = draft.reminderAt || '';
-    saveButton.textContent = editingId ? "更新する" : "保存する";
+    saveButton.textContent = editingId ? "ノートを更新" : "ノートを保存";
   } catch {
     // ignore
   }
