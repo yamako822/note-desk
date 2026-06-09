@@ -388,6 +388,7 @@ test.describe('NoteDesk E2E', () => {
 
   test('browser AI buttons apply generated title tags and summary', async ({ page }) => {
     await page.addInitScript(() => {
+      localStorage.setItem('note-desk-ai-mode', 'auto');
       const prompt = async (input) => {
         if (input.includes('短いタイトル')) return '改善計画';
         if (input.includes('最大5個')) return '改善, 仕事, 重要';
@@ -427,6 +428,7 @@ test.describe('NoteDesk E2E', () => {
 
   test('browser AI falls back to lightweight local mode without LanguageModel', async ({ page }) => {
     await page.addInitScript(() => {
+      localStorage.setItem('note-desk-ai-mode', 'light');
       Object.defineProperty(window, 'LanguageModel', {
         configurable: true,
         value: undefined
@@ -454,6 +456,45 @@ test.describe('NoteDesk E2E', () => {
     await page.click('[data-ai-action="checklist"]');
     await expect(page.locator('#memoBody')).toHaveValue(/## AIチェックリスト/);
     await expect(page.locator('#memoBody')).toHaveValue(/- \[ \]/);
+  });
+
+  test('high performance browser AI uses WebLLM provider when available', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('note-desk-ai-mode', 'high');
+      Object.defineProperty(navigator, 'gpu', {
+        configurable: true,
+        value: {}
+      });
+      window.__noteDeskWebLlmFactory = async () => ({
+        prebuiltAppConfig: {
+          model_list: [{ model_id: 'Qwen2-0.5B-Instruct-q4f16_1-MLC' }]
+        },
+        CreateMLCEngine: async (_model, config) => {
+          config?.initProgressCallback?.({ text: 'mock loading', progress: 1 });
+          return {
+            chat: {
+              completions: {
+                create: async ({ messages }) => {
+                  const prompt = messages.at(-1).content;
+                  if (prompt.includes('短いタイトル')) {
+                    return { choices: [{ message: { content: '高性能改善ノート' } }] };
+                  }
+                  return { choices: [{ message: { content: '- 高性能AIで整理しました' } }] };
+                }
+              }
+            }
+          };
+        }
+      });
+    });
+
+    await page.goto('/memo.html');
+    await page.waitForSelector('#memoBody');
+    await expect(page.locator('#browserAiModeSelect')).toHaveValue('high');
+    await page.fill('#memoBody', '改善業務の内容を整理し、資料を共有する。');
+    await page.click('[data-ai-action="title"]');
+    await expect(page.locator('#memoTitle')).toHaveValue('高性能改善ノート');
+    await expect(page.locator('#browserAiStatus')).toContainText('高性能AIでタイトル');
   });
 
   test('tag filter opens dialog and filters by selected tag', async ({ page }) => {
@@ -529,11 +570,13 @@ test.describe('NoteDesk E2E', () => {
 
     const desktop = await page.evaluate(() => {
       const app = document.querySelector('.app').getBoundingClientRect();
+      const sidebar = document.querySelector('.workspace-sidebar').getBoundingClientRect();
       const editor = document.querySelector('.editor').getBoundingClientRect();
       const library = document.querySelector('.library').getBoundingClientRect();
       const gridColumns = getComputedStyle(document.querySelector('.app')).gridTemplateColumns;
       return {
         appWidth: app.width,
+        sidebarWidth: sidebar.width,
         editorWidth: editor.width,
         libraryWidth: library.width,
         gridColumns
@@ -541,8 +584,10 @@ test.describe('NoteDesk E2E', () => {
     });
 
     expect(desktop.appWidth).toBeGreaterThan(1320);
-    expect(desktop.libraryWidth).toBeGreaterThan(desktop.editorWidth);
-    expect(desktop.gridColumns.split(' ').length).toBeGreaterThanOrEqual(2);
+    expect(desktop.sidebarWidth).toBeLessThan(desktop.libraryWidth);
+    expect(desktop.libraryWidth).toBeGreaterThan(380);
+    expect(desktop.editorWidth).toBeGreaterThan(360);
+    expect(desktop.gridColumns.split(' ').length).toBe(3);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();

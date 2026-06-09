@@ -15,6 +15,7 @@ const LAYOUT_SETTING_KEY = "note-desk-layout-setting";
 const LAST_OPEN_MEMO_KEY = "note-desk-last-open-note";
 const OUTLOOK_REMINDER_SETTING_KEY = "note-desk-outlook-reminder-minutes";
 const AUTOSAVE_SETTING_KEY = "note-desk-autosave";
+const AI_MODE_SETTING_KEY = "note-desk-ai-mode";
 
 const loginScreen = document.querySelector("#loginScreen");
 const appScreen = document.querySelector("#appScreen");
@@ -53,7 +54,13 @@ const autoTagStatus = document.querySelector("#autoTagStatus");
 const browserAiPanel = document.querySelector(".browser-ai-panel");
 const browserAiStatus = document.querySelector("#browserAiStatus");
 const browserAiCheckButton = document.querySelector("#browserAiCheckButton");
+const browserAiModeSelect = document.querySelector("#browserAiModeSelect");
 const browserAiActionButtons = document.querySelectorAll("[data-ai-action]");
+const sidebarNewNoteButton = document.querySelector("#sidebarNewNoteButton");
+const sidebarDateViewButtons = document.querySelectorAll("[data-sidebar-date-view]");
+const sidebarNotebookList = document.querySelector("#sidebarNotebookList");
+const sidebarTagList = document.querySelector("#sidebarTagList");
+const sidebarTotalCount = document.querySelector("#sidebarTotalCount");
 const searchInput = document.querySelector("#searchInput");
 const sortSelect = document.querySelector("#sortSelect");
 const notebookFilterSelect = document.querySelector("#notebookFilterSelect");
@@ -143,6 +150,16 @@ const BROWSER_AI_SESSION_OPTIONS = {
   expectedInputs: [{ type: "text", languages: ["ja", "en"] }],
   expectedOutputs: [{ type: "text", languages: ["ja"] }],
 };
+const AI_MODES = new Set(["high", "auto", "light"]);
+const DEFAULT_AI_MODE = "high";
+const WEBLLM_CDN_URL = "https://esm.run/@mlc-ai/web-llm";
+const WEBLLM_MODEL_PATTERNS = [
+  /Qwen2\.5-0\.5B.*Instruct.*q4f/i,
+  /Qwen2-0\.5B.*Instruct.*q4f/i,
+  /Llama-3\.2-1B.*Instruct.*q4f/i,
+  /Phi-3.*mini.*Instruct.*q4f/i,
+  /Gemma.*2B.*it.*q4f/i,
+];
 const LOCAL_AI_TASK_WORDS = [
   "確認",
   "対応",
@@ -294,6 +311,10 @@ let currentAttachments = [];
 let dialogSearchQuery = "";
 let browserAiBaseSession = null;
 let browserAiBusy = false;
+let browserAiMode = readBrowserAiMode();
+let webLlmModule = null;
+let webLlmEngine = null;
+let webLlmModelId = "";
 
 function readDisplaySettings() {
   try {
@@ -319,6 +340,22 @@ function readCustomColors() {
   } catch {
     return { ...DEFAULT_LIGHT_COLORS };
   }
+}
+
+function readBrowserAiMode() {
+  const saved = localStorage.getItem(AI_MODE_SETTING_KEY);
+  return AI_MODES.has(saved) ? saved : DEFAULT_AI_MODE;
+}
+
+function saveBrowserAiMode(mode) {
+  try {
+    localStorage.setItem(AI_MODE_SETTING_KEY, mode);
+  } catch {}
+}
+
+function applyBrowserAiMode(mode) {
+  browserAiMode = AI_MODES.has(mode) ? mode : DEFAULT_AI_MODE;
+  if (browserAiModeSelect) browserAiModeSelect.value = browserAiMode;
 }
 
 function saveCustomColors(colors) {
@@ -1049,6 +1086,111 @@ function createLocalBrowserAiResult(action) {
   return "";
 }
 
+function canUseWebLlm() {
+  return Boolean(navigator.gpu);
+}
+
+async function importWebLlmModule() {
+  if (webLlmModule) return webLlmModule;
+  if (typeof window.__noteDeskWebLlmFactory === "function") {
+    webLlmModule = await window.__noteDeskWebLlmFactory();
+    return webLlmModule;
+  }
+  webLlmModule = await import(WEBLLM_CDN_URL);
+  return webLlmModule;
+}
+
+function getWebLlmModelId(webllm) {
+  const modelList = Array.isArray(webllm?.prebuiltAppConfig?.model_list)
+    ? webllm.prebuiltAppConfig.model_list
+    : [];
+  const ids = modelList
+    .map((model) => model.model_id || model.model || model.id)
+    .filter(Boolean);
+
+  for (const pattern of WEBLLM_MODEL_PATTERNS) {
+    const match = ids.find((id) => pattern.test(id));
+    if (match) return match;
+  }
+
+  return ids.find((id) => /Instruct/i.test(id) && /q4f/i.test(id)) || "Qwen2-0.5B-Instruct-q4f16_1-MLC";
+}
+
+function formatWebLlmProgress(progress) {
+  const text = progress?.text || progress?.message || "高性能AIモデルを準備しています";
+  const percent = Number.isFinite(progress?.progress)
+    ? ` ${Math.round(progress.progress * 100)}%`
+    : "";
+  return `${text}${percent}`;
+}
+
+async function ensureWebLlmEngine() {
+  if (webLlmEngine) return webLlmEngine;
+  if (!canUseWebLlm()) {
+    throw new Error("このブラウザではWebGPUが利用できないため、高性能AIを使えません。");
+  }
+
+  setBrowserAiStatus("高性能AIを読み込んでいます。初回は時間がかかります。", "working");
+  const webllm = await importWebLlmModule();
+  const modelId = getWebLlmModelId(webllm);
+  webLlmModelId = modelId;
+  webLlmEngine = await webllm.CreateMLCEngine(modelId, {
+    initProgressCallback(progress) {
+      setBrowserAiStatus(formatWebLlmProgress(progress), "working");
+    },
+  });
+  setBrowserAiStatus(`高性能AIを利用できます: ${modelId}`, "ready");
+  return webLlmEngine;
+}
+
+async function promptWebLlm(prompt) {
+  const engine = await ensureWebLlmEngine();
+  const response = await engine.chat.completions.create({
+    messages: [
+      {
+        role: "system",
+        content: "あなたはNoteDeskの高性能ブラウザAIです。ノート作成を助けるため、日本語で簡潔に回答してください。ノート本文にない事実は追加しないでください。",
+      },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.2,
+    max_tokens: 420,
+  });
+  return cleanAiText(response?.choices?.[0]?.message?.content || "");
+}
+
+async function generateBrowserAiResult(action, prompt) {
+  if (browserAiMode === "light") {
+    return { result: createLocalBrowserAiResult(action), source: "軽量AI" };
+  }
+
+  if (browserAiMode === "high") {
+    try {
+      return { result: await promptWebLlm(prompt), source: "高性能AI" };
+    } catch (error) {
+      console.warn("WebLLM failed, falling back.", error);
+    }
+  }
+
+  if (getBrowserLanguageModel()?.create) {
+    try {
+      return { result: await promptBrowserAi(prompt), source: "本格AI" };
+    } catch (error) {
+      console.warn("Prompt API failed, falling back.", error);
+    }
+  }
+
+  if (browserAiMode === "high" || browserAiMode === "auto") {
+    try {
+      return { result: await promptWebLlm(prompt), source: "高性能AI" };
+    } catch (error) {
+      console.warn("WebLLM secondary fallback failed.", error);
+    }
+  }
+
+  return { result: createLocalBrowserAiResult(action), source: "軽量AI" };
+}
+
 async function getBrowserAiAvailability(model) {
   if (!model?.availability) return "unavailable";
   try {
@@ -1136,12 +1278,24 @@ async function checkBrowserAiAvailability() {
   setBrowserAiStatus("ブラウザAIを確認しています。", "working");
 
   try {
-    const model = getBrowserLanguageModel();
-    if (!model?.create) {
+    if (browserAiMode === "light") {
       setBrowserAiStatus("通常版Edgeでも使える軽量ブラウザAIで利用できます。外部送信なしで端末内処理します。", "ready");
       return;
     }
-    await ensureBrowserAiSession();
+    if (browserAiMode === "high") {
+      await ensureWebLlmEngine();
+      return;
+    }
+    const model = getBrowserLanguageModel();
+    if (model?.create) {
+      await ensureBrowserAiSession();
+      return;
+    }
+    if (canUseWebLlm()) {
+      setBrowserAiStatus("高性能AIを利用できます。初回実行時にモデルを準備します。", "ready");
+      return;
+    }
+    setBrowserAiStatus("軽量ブラウザAIで利用できます。外部送信なしで端末内処理します。", "ready");
   } catch (error) {
     setBrowserAiStatus("組み込みAIは利用できませんが、軽量ブラウザAIで利用できます。外部送信なしで端末内処理します。", "ready");
   } finally {
@@ -1171,22 +1325,8 @@ async function runBrowserAiAction(action) {
   setBrowserAiStatus("AIで作成しています。", "working");
 
   try {
-    let usedLocalFallback = false;
-    let result = "";
-
-    if (getBrowserLanguageModel()?.create) {
-      try {
-        result = await promptBrowserAi(prompts[action]);
-      } catch {
-        result = createLocalBrowserAiResult(action);
-        usedLocalFallback = true;
-      }
-    } else {
-      result = createLocalBrowserAiResult(action);
-      usedLocalFallback = true;
-    }
-
-    const statusPrefix = usedLocalFallback ? "軽量AIで" : "";
+    const { result, source } = await generateBrowserAiResult(action, prompts[action]);
+    const statusPrefix = `${source}で`;
 
     if (action === "title") {
       const title = cleanAiTitle(result);
@@ -2270,6 +2410,97 @@ function renderTags() {
   });
 }
 
+function createSidebarButton(label, count, active, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "sidebar-nav-item";
+  button.classList.toggle("active", active);
+  button.innerHTML = `<span></span><strong></strong>`;
+  button.querySelector("span").textContent = label;
+  button.querySelector("strong").textContent = String(count);
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function getMemoCountForDateView(view) {
+  const previousView = dateViewMode;
+  dateViewMode = view;
+  const count = memos.filter((memo) => matchesDateView(memo)).length;
+  dateViewMode = previousView;
+  return count;
+}
+
+function renderSidebarNavigation() {
+  if (sidebarTotalCount) sidebarTotalCount.textContent = `${memos.length}件のノート`;
+
+  sidebarDateViewButtons.forEach((button) => {
+    const view = button.dataset.sidebarDateView;
+    const isActive = dateViewMode === view;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+    if (!button.querySelector("strong")) {
+      const label = button.textContent.trim();
+      button.textContent = "";
+      const text = document.createElement("span");
+      text.textContent = label;
+      const count = document.createElement("strong");
+      button.append(text, count);
+    }
+    const count = button.querySelector("strong");
+    if (count && DATE_VIEW_MODES.has(view)) count.textContent = String(getMemoCountForDateView(view));
+  });
+
+  if (sidebarNotebookList) {
+    sidebarNotebookList.innerHTML = "";
+    sidebarNotebookList.append(
+      createSidebarButton("すべて", memos.length, activeNotebook === "all", () => {
+        activeNotebook = "all";
+        resetPagination();
+        render();
+      }),
+    );
+
+    getNotebookNames().forEach((notebook) => {
+      const count = memos.filter((memo) => getMemoNotebook(memo) === notebook).length;
+      sidebarNotebookList.append(
+        createSidebarButton(notebook, count, activeNotebook === notebook, () => {
+          activeNotebook = notebook;
+          resetPagination();
+          render();
+        }),
+      );
+    });
+  }
+
+  if (sidebarTagList) {
+    sidebarTagList.innerHTML = "";
+    const tagCounts = new Map();
+    memos.forEach((memo) => {
+      memo.tags.forEach((tag) => tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1));
+    });
+    const tags = [...tagCounts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja-JP"))
+      .slice(0, 12);
+
+    sidebarTagList.append(
+      createSidebarButton("すべて", memos.length, activeTag === "all", () => {
+        activeTag = "all";
+        resetPagination();
+        render();
+      }),
+    );
+    tags.forEach(([tag, count]) => {
+      sidebarTagList.append(
+        createSidebarButton(tag, count, activeTag === tag, () => {
+          activeTag = tag;
+          resetPagination();
+          render();
+        }),
+      );
+    });
+  }
+}
+
 function openTagFilterDialog() {
   if (!tagFilterDialog) return;
   tagFilterDialog.hidden = false;
@@ -2404,6 +2635,7 @@ function render() {
   renderFavoriteFilter();
   renderSortControl();
   renderTags();
+  renderSidebarNavigation();
   renderMemos();
   restoreLastOpenMemoIfNeeded();
 }
@@ -3015,6 +3247,7 @@ function bindLoginPage() {
 }
 
 function bindMemoPage() {
+  applyBrowserAiMode(browserAiMode);
   usernameForm.addEventListener("submit", updateUsername);
   feedbackButton.addEventListener("click", openFeedbackForm);
   logoutButton.addEventListener("click", logout);
@@ -3150,6 +3383,21 @@ function bindMemoPage() {
     resetForm();
     document.querySelector(".editor")?.scrollIntoView({ block: "start", behavior: "smooth" });
   });
+  sidebarNewNoteButton?.addEventListener("click", () => {
+    closeMemoDialog();
+    clearDraft();
+    clearRememberedOpenMemo();
+    resetForm();
+    document.querySelector(".editor")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
+  sidebarDateViewButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const view = button.dataset.sidebarDateView;
+      dateViewMode = DATE_VIEW_MODES.has(view) ? view : DEFAULT_DATE_VIEW;
+      resetPagination();
+      render();
+    });
+  });
 
   // Tag suggestion handlers
   if (tagsInput) {
@@ -3168,6 +3416,17 @@ function bindMemoPage() {
     tagsInput?.focus();
   });
   browserAiCheckButton?.addEventListener("click", checkBrowserAiAvailability);
+  browserAiModeSelect?.addEventListener("change", () => {
+    applyBrowserAiMode(browserAiModeSelect.value);
+    saveBrowserAiMode(browserAiMode);
+    if (browserAiMode === "high") {
+      setBrowserAiStatus("高性能AIを使います。初回実行時はモデル準備に時間がかかります。", "ready");
+    } else if (browserAiMode === "auto") {
+      setBrowserAiStatus("自動モードです。対応環境では本格AI、未対応なら軽量AIを使います。", "ready");
+    } else {
+      setBrowserAiStatus("軽量AIを使います。通常版Edgeでもすぐに利用できます。", "ready");
+    }
+  });
   browserAiActionButtons.forEach((button) => {
     button.addEventListener("click", () => runBrowserAiAction(button.dataset.aiAction));
   });

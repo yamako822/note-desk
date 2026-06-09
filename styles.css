@@ -288,14 +288,16 @@ label {
 
 .app {
   display: grid;
-  grid-template-columns: minmax(380px, 0.85fr) minmax(0, 1.65fr);
-  gap: 28px;
-  width: min(1680px, calc(100% - clamp(32px, 6vw, 96px)));
+  grid-template-columns: minmax(220px, 0.48fr) minmax(420px, 1.1fr) minmax(400px, 0.95fr);
+  grid-template-areas: "sidebar library editor";
+  gap: 18px;
+  width: min(1820px, calc(100% - clamp(24px, 4vw, 72px)));
   margin: 32px auto;
   align-items: start;
   filter: brightness(var(--app-brightness));
 }
 
+.workspace-sidebar,
 .editor,
 .library {
   background: var(--panel);
@@ -304,14 +306,118 @@ label {
   box-shadow: var(--shadow);
 }
 
+.workspace-sidebar {
+  grid-area: sidebar;
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 14px;
+  max-height: calc(100dvh - 48px);
+  min-height: calc(100dvh - 64px);
+  overflow: auto;
+  padding: 18px;
+}
+
 .editor {
+  grid-area: editor;
   align-self: start;
   padding: 24px;
 }
 
 .library {
+  grid-area: library;
   min-height: calc(100vh - 64px);
   padding: 22px;
+}
+
+.sidebar-brand {
+  display: grid;
+  gap: 4px;
+}
+
+.sidebar-brand h2 {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.sidebar-brand p:last-child {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+#sidebarNewNoteButton {
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.sidebar-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.sidebar-section h3 {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 4px;
+}
+
+.sidebar-nav button,
+.sidebar-nav-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.sidebar-nav button span,
+.sidebar-nav-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-nav button strong,
+.sidebar-nav-item strong {
+  min-width: 22px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.sidebar-nav button:hover,
+.sidebar-nav button.active,
+.sidebar-nav-item:hover,
+.sidebar-nav-item.active {
+  border-color: var(--accent-line);
+  background: var(--soft);
+  color: var(--accent-dark);
+}
+
+.sidebar-nav button.active strong,
+.sidebar-nav-item.active strong {
+  background: var(--accent);
+  color: var(--panel);
 }
 
 .app-header,
@@ -480,6 +586,25 @@ textarea {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.55;
+}
+
+.browser-ai-controls {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  flex: 0 0 min(100%, 230px);
+}
+
+.browser-ai-controls label {
+  display: grid;
+  gap: 4px;
+}
+
+.browser-ai-controls select {
+  min-height: 40px;
+  padding: 7px 10px;
+  font-size: 14px;
 }
 
 .browser-ai-actions {
@@ -1773,12 +1898,44 @@ mark {
   text-align: center;
 }
 
+@media (max-width: 1240px) {
+  .app {
+    grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+    grid-template-areas:
+      "sidebar library"
+      "editor editor";
+    width: min(100% - 24px, 1120px);
+  }
+
+  .workspace-sidebar {
+    min-height: auto;
+  }
+
+  .editor {
+    max-width: none;
+  }
+}
+
 @media (max-width: 960px) {
   .app {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "editor"
+      "library"
+      "sidebar";
     margin: 16px auto;
     width: min(100% - 24px, 720px);
     gap: 16px;
+  }
+
+  .workspace-sidebar {
+    position: static;
+    max-height: none;
+    min-height: auto;
+  }
+
+  .sidebar-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .library {
@@ -1862,6 +2019,15 @@ mark {
     grid-template-columns: 1fr;
   }
 
+  .browser-ai-header {
+    flex-direction: column;
+  }
+
+  .browser-ai-controls {
+    width: 100%;
+    flex-basis: auto;
+  }
+
   .memo-list.list-view .memo-card {
     grid-template-columns: 1fr;
     grid-template-areas:
@@ -1881,6 +2047,14 @@ mark {
 }
 
 @media (max-width: 560px) {
+  .sidebar-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .browser-ai-controls {
+    grid-template-columns: 1fr;
+  }
+
   .note-meta-row {
     grid-template-columns: 1fr;
   }
