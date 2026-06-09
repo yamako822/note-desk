@@ -10,10 +10,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="NoteDesk">
     <title>NoteDesk | Notes</title>
-    <link rel="manifest" href="manifest.webmanifest?v=25">
+    <link rel="manifest" href="manifest.webmanifest?v=26">
     <link rel="icon" href="icons/icon.svg?v=2" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/icon-192.png?v=2">
-    <link rel="stylesheet" href="styles.css?v=25">
+    <link rel="stylesheet" href="styles.css?v=26">
   </head>
   <body>
     <main id="appScreen" class="app" hidden>
@@ -21,13 +21,15 @@
 
       <button type="button" class="mobile-organize-toggle" id="mobileOrganizeToggle" aria-controls="workspaceSidebar" aria-expanded="false" aria-label="整理メニューを開く">›</button>
       <div class="mobile-sidebar-backdrop" id="mobileSidebarBackdrop" hidden></div>
+      <button type="button" class="mobile-ribbon-toggle" id="mobileRibbonToggle" aria-controls="appRibbon" aria-expanded="false" aria-label="リボンを開く">‹</button>
+      <div class="mobile-ribbon-backdrop" id="mobileRibbonBackdrop" hidden></div>
 
       <nav class="mobile-section-tabs" aria-label="スマホ表示切替">
         <button type="button" data-mobile-view="library" aria-pressed="true">一覧</button>
         <button type="button" data-mobile-view="editor" aria-pressed="false">作成</button>
       </nav>
 
-      <section class="app-ribbon" aria-label="レイアウトと絞り込み">
+      <section class="app-ribbon" id="appRibbon" aria-label="レイアウトと絞り込み">
         <div class="ribbon-group ribbon-group-create">
           <p class="ribbon-title">作成</p>
           <button type="button" class="secondary" id="newMemoButton">新規</button>
@@ -177,7 +179,9 @@
             <button type="button" class="secondary" data-markdown-action="bullet" title="箇条書きを挿入">•</button>
             <button type="button" class="secondary" data-markdown-action="check" title="チェック項目を挿入">☑</button>
             <button type="button" class="secondary" data-markdown-action="link" title="リンクを挿入">🔗</button>
+            <button type="button" class="secondary" id="voiceInputButton" title="音声で本文へ入力">音声</button>
           </div>
+          <p class="voice-input-status" id="voiceInputStatus" aria-live="polite" hidden></p>
           <textarea id="memoBody" rows="10" maxlength="10000" placeholder="Markdownで本文を書けます。見出し、箇条書き、チェックリスト、リンクに対応しています。" aria-required="true"></textarea>
           <section class="browser-ai-panel" aria-labelledby="browserAiTitle">
             <div class="browser-ai-header">
@@ -538,7 +542,7 @@
       </article>
     </div>
 
-    <script type="module" src="app.js?v=25"></script>
-    <script src="pwa.js?v=25"></script>
+    <script type="module" src="app.js?v=26"></script>
+    <script src="pwa.js?v=26"></script>
   </body>
 </html>

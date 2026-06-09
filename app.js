@@ -27,6 +27,8 @@ const mobileSectionTabs = document.querySelectorAll("[data-mobile-view]");
 const mobileOrganizeToggle = document.querySelector("#mobileOrganizeToggle");
 const mobileSidebarBackdrop = document.querySelector("#mobileSidebarBackdrop");
 const mobileSidebarCloseButton = document.querySelector("#mobileSidebarCloseButton");
+const mobileRibbonToggle = document.querySelector("#mobileRibbonToggle");
+const mobileRibbonBackdrop = document.querySelector("#mobileRibbonBackdrop");
 const workspaceToggleButton = document.querySelector("#workspaceToggleButton");
 const workspaceModeSelect = document.querySelector("#workspaceModeSelect");
 const workspacePositionSelect = document.querySelector("#workspacePositionSelect");
@@ -63,6 +65,8 @@ const attachmentList = document.querySelector("#attachmentList");
 const reminderInput = document.querySelector("#memoReminder");
 const autoTagButton = document.querySelector("#autoTagButton");
 const autoTagStatus = document.querySelector("#autoTagStatus");
+const voiceInputButton = document.querySelector("#voiceInputButton");
+const voiceInputStatus = document.querySelector("#voiceInputStatus");
 const browserAiPanel = document.querySelector(".browser-ai-panel");
 const browserAiStatus = document.querySelector("#browserAiStatus");
 const browserAiCheckButton = document.querySelector("#browserAiCheckButton");
@@ -325,6 +329,7 @@ let workspaceMode = readWorkspaceMode();
 let workspacePosition = readWorkspacePosition();
 let contentLayoutMode = readContentLayoutMode();
 let mobileSidebarOpen = false;
+let mobileRibbonOpen = false;
 let showFavoritesOnly = false;
 let openMemoId = null;
 let currentPage = 1;
@@ -339,6 +344,8 @@ let browserAiMode = readBrowserAiMode();
 let webLlmModule = null;
 let webLlmEngine = null;
 let webLlmModelId = "";
+let speechRecognition = null;
+let voiceInputActive = false;
 
 function readDisplaySettings() {
   try {
@@ -476,9 +483,12 @@ function setMobileSidebarOpen(isOpen) {
 
   const canUseDrawer = isMobileViewport() || workspaceMode === "slide";
   mobileSidebarOpen = Boolean(isOpen) && canUseDrawer;
+  if (mobileSidebarOpen) mobileRibbonOpen = false;
   appScreen.dataset.sidebarOpen = mobileSidebarOpen ? "true" : "false";
+  appScreen.dataset.ribbonOpen = mobileRibbonOpen ? "true" : "false";
   appScreen.dataset.workspaceOpen = workspaceMode === "fixed" ? "true" : String(mobileSidebarOpen);
   if (mobileSidebarBackdrop) mobileSidebarBackdrop.hidden = !mobileSidebarOpen;
+  if (mobileRibbonBackdrop) mobileRibbonBackdrop.hidden = !mobileRibbonOpen;
   if (mobileOrganizeToggle) {
     mobileOrganizeToggle.setAttribute("aria-expanded", String(mobileSidebarOpen));
     mobileOrganizeToggle.setAttribute("aria-label", mobileSidebarOpen ? "整理メニューを閉じる" : "整理メニューを開く");
@@ -491,10 +501,37 @@ function setMobileSidebarOpen(isOpen) {
       : (mobileSidebarOpen ? "整理を閉じる" : "整理を開く");
   }
   document.body.classList.toggle("mobile-sidebar-open", mobileSidebarOpen);
+  document.body.classList.toggle("mobile-ribbon-open", mobileRibbonOpen);
 }
 
 function toggleMobileSidebar() {
   setMobileSidebarOpen(!mobileSidebarOpen);
+}
+
+function setMobileRibbonOpen(isOpen) {
+  if (!isMemoPage || !appScreen) return;
+
+  mobileRibbonOpen = Boolean(isOpen) && isMobileViewport();
+  if (mobileRibbonOpen) mobileSidebarOpen = false;
+  appScreen.dataset.ribbonOpen = mobileRibbonOpen ? "true" : "false";
+  appScreen.dataset.sidebarOpen = mobileSidebarOpen ? "true" : "false";
+  if (mobileRibbonBackdrop) mobileRibbonBackdrop.hidden = !mobileRibbonOpen;
+  if (mobileSidebarBackdrop) mobileSidebarBackdrop.hidden = !mobileSidebarOpen;
+  if (mobileRibbonToggle) {
+    mobileRibbonToggle.setAttribute("aria-expanded", String(mobileRibbonOpen));
+    mobileRibbonToggle.setAttribute("aria-label", mobileRibbonOpen ? "リボンを閉じる" : "リボンを開く");
+    mobileRibbonToggle.textContent = mobileRibbonOpen ? "›" : "‹";
+  }
+  if (mobileOrganizeToggle) {
+    mobileOrganizeToggle.setAttribute("aria-expanded", String(mobileSidebarOpen));
+    mobileOrganizeToggle.textContent = mobileSidebarOpen ? "‹" : "›";
+  }
+  document.body.classList.toggle("mobile-ribbon-open", mobileRibbonOpen);
+  document.body.classList.toggle("mobile-sidebar-open", mobileSidebarOpen);
+}
+
+function toggleMobileRibbon() {
+  setMobileRibbonOpen(!mobileRibbonOpen);
 }
 
 function toggleWorkspacePanel() {
@@ -511,6 +548,7 @@ function toggleWorkspacePanel() {
 
 function showMobileView(mode, options = {}) {
   setMobileSidebarOpen(false);
+  setMobileRibbonOpen(false);
   applyMobileView(mode, { persist: true, scrollTop: true, ...options });
 }
 
@@ -559,6 +597,120 @@ function applySafeModeSetting() {
   } else {
     applyBrowserAiMode(browserAiMode);
   }
+}
+
+function setVoiceInputStatus(message, state = "info") {
+  if (!voiceInputStatus) return;
+  voiceInputStatus.textContent = message;
+  voiceInputStatus.hidden = !message;
+  voiceInputStatus.dataset.state = state;
+}
+
+function getSpeechRecognitionConstructor() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function setVoiceInputActive(isActive) {
+  voiceInputActive = Boolean(isActive);
+  if (voiceInputButton) {
+    voiceInputButton.textContent = voiceInputActive ? "停止" : "音声";
+    voiceInputButton.classList.toggle("active", voiceInputActive);
+    voiceInputButton.setAttribute("aria-pressed", String(voiceInputActive));
+  }
+}
+
+function appendVoiceText(text) {
+  const cleanText = text.trim();
+  if (!cleanText || !bodyInput) return;
+
+  const current = bodyInput.value;
+  const needsSpace = current && !/[\s\n]$/.test(current);
+  const insertText = `${needsSpace ? "\n" : ""}${cleanText}`;
+  const start = bodyInput.selectionStart ?? current.length;
+  const end = bodyInput.selectionEnd ?? start;
+  bodyInput.setRangeText(insertText, start, end, "end");
+  bodyInput.focus();
+  bodyInput.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function stopVoiceInput() {
+  if (speechRecognition && voiceInputActive) {
+    speechRecognition.stop();
+    return;
+  }
+  setVoiceInputActive(false);
+}
+
+function startVoiceInput() {
+  const SpeechRecognition = getSpeechRecognitionConstructor();
+  if (!SpeechRecognition) {
+    setVoiceInputStatus("このブラウザは音声入力に未対応です。Chrome/Edgeの対応版で試してください。", "error");
+    return;
+  }
+
+  try {
+    speechRecognition = new SpeechRecognition();
+    speechRecognition.lang = "ja-JP";
+    speechRecognition.interimResults = true;
+    speechRecognition.continuous = false;
+
+    let finalTranscript = "";
+
+    speechRecognition.onstart = () => {
+      setVoiceInputActive(true);
+      setVoiceInputStatus("音声入力中です。話した内容を本文へ追加します。環境によってはブラウザの音声サービスを使う場合があります。", "active");
+    };
+
+    speechRecognition.onresult = (event) => {
+      let interimTranscript = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const transcript = event.results[index][0]?.transcript || "";
+        if (event.results[index].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      if (interimTranscript) {
+        setVoiceInputStatus(`認識中: ${interimTranscript}`, "active");
+      }
+    };
+
+    speechRecognition.onerror = (event) => {
+      const messages = {
+        "not-allowed": "マイクの使用が許可されていません。ブラウザの権限設定を確認してください。",
+        "no-speech": "音声を検出できませんでした。もう一度お試しください。",
+        network: "音声認識の通信またはブラウザ処理でエラーが発生しました。",
+      };
+      setVoiceInputStatus(messages[event.error] || "音声入力に失敗しました。", "error");
+    };
+
+    speechRecognition.onend = () => {
+      if (finalTranscript.trim()) {
+        appendVoiceText(finalTranscript);
+        setVoiceInputStatus("音声を本文に追加しました。", "info");
+      } else if (voiceInputStatus?.dataset.state === "active") {
+        setVoiceInputStatus("音声入力を終了しました。", "info");
+      }
+      setVoiceInputActive(false);
+      speechRecognition = null;
+    };
+
+    speechRecognition.start();
+  } catch (error) {
+    console.error(error);
+    setVoiceInputActive(false);
+    setVoiceInputStatus("音声入力を開始できませんでした。マイク権限を確認してください。", "error");
+  }
+}
+
+function toggleVoiceInput() {
+  if (voiceInputActive) {
+    stopVoiceInput();
+    return;
+  }
+  startVoiceInput();
 }
 
 function saveCustomColors(colors) {
@@ -3397,6 +3549,7 @@ function bindMemoPage() {
     });
   });
   mobileOrganizeToggle?.addEventListener("click", toggleMobileSidebar);
+  mobileRibbonToggle?.addEventListener("click", toggleMobileRibbon);
   workspaceToggleButton?.addEventListener("click", toggleWorkspacePanel);
   workspaceModeSelect?.addEventListener("change", () => {
     workspaceMode = WORKSPACE_MODES.has(workspaceModeSelect.value) ? workspaceModeSelect.value : "fixed";
@@ -3418,12 +3571,15 @@ function bindMemoPage() {
     saveLayoutSetting(layoutSetting);
   });
   mobileSidebarBackdrop?.addEventListener("click", () => setMobileSidebarOpen(false));
+  mobileRibbonBackdrop?.addEventListener("click", () => setMobileRibbonOpen(false));
   mobileSidebarCloseButton?.addEventListener("click", () => setMobileSidebarOpen(false));
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && mobileSidebarOpen) setMobileSidebarOpen(false);
+    if (event.key === "Escape" && mobileRibbonOpen) setMobileRibbonOpen(false);
   });
   window.addEventListener("resize", () => {
     if (!isMobileViewport() && workspaceMode !== "slide") setMobileSidebarOpen(false);
+    if (!isMobileViewport()) setMobileRibbonOpen(false);
     applyMobileView(mobileViewMode);
     applyWorkspaceLayout();
   });
@@ -3530,6 +3686,7 @@ function bindMemoPage() {
   document.querySelectorAll("[data-markdown-action]").forEach((button) => {
     button.addEventListener("click", () => insertMarkdown(button.dataset.markdownAction));
   });
+  voiceInputButton?.addEventListener("click", toggleVoiceInput);
   tagFilterButton?.addEventListener("click", openTagFilterDialog);
   tagFilterDialogCloseButton?.addEventListener("click", closeTagFilterDialog);
   tagFilterDialog?.addEventListener("click", (event) => {

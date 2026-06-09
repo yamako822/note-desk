@@ -155,6 +155,17 @@ test.describe('NoteDesk E2E', () => {
     await expect(page.locator('#memoTags')).toHaveValue(/仕事/);
   });
 
+  test('voice input button shows guidance when speech recognition is unavailable', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: undefined });
+      Object.defineProperty(window, 'webkitSpeechRecognition', { configurable: true, value: undefined });
+    });
+    await page.goto('/memo.html');
+    await page.waitForSelector('#voiceInputButton');
+    await page.click('#voiceInputButton');
+    await expect(page.locator('#voiceInputStatus')).toContainText('音声入力に未対応');
+  });
+
   test('supports notebook markdown attachments duplicate archive and export', async ({ page }) => {
     await page.goto('/memo.html');
     await page.waitForSelector('#memoTitle');
@@ -691,9 +702,20 @@ test.describe('NoteDesk E2E', () => {
     await expect(page.locator('.mobile-section-tabs')).toBeVisible();
     await expect(page.locator('.mobile-section-tabs [data-mobile-view]')).toHaveCount(2);
     await expect(page.locator('#mobileOrganizeToggle')).toBeVisible();
+    await expect(page.locator('#mobileRibbonToggle')).toBeVisible();
+    await expect(page.locator('.app-ribbon')).toBeHidden();
     await expect(page.locator('.library')).toBeVisible();
     await expect(page.locator('.editor')).toBeHidden();
     await expect(page.locator('.workspace-sidebar')).toBeHidden();
+
+    await page.click('#mobileRibbonToggle');
+    await expect(page.locator('.app-ribbon')).toBeVisible();
+    await expect(page.locator('#mobileRibbonToggle')).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#mobileRibbonBackdrop')).toBeVisible();
+
+    await page.click('#mobileRibbonBackdrop');
+    await expect(page.locator('.app-ribbon')).toBeHidden();
+    await expect(page.locator('#mobileRibbonToggle')).toHaveAttribute('aria-expanded', 'false');
 
     await page.click('[data-mobile-view="editor"]');
     await expect(page.locator('.editor')).toBeVisible();
@@ -709,8 +731,10 @@ test.describe('NoteDesk E2E', () => {
     await expect(page.locator('#mobileOrganizeToggle')).toHaveAttribute('aria-expanded', 'false');
 
     await page.click('[data-mobile-view="library"]');
+    await page.click('#mobileRibbonToggle');
     await page.click('#newMemoButton');
     await expect(page.locator('.editor')).toBeVisible();
+    await expect(page.locator('.app-ribbon')).toBeHidden();
     await expect(page.locator('.mobile-section-tabs [data-mobile-view="editor"]')).toHaveAttribute('aria-pressed', 'true');
   });
 });
