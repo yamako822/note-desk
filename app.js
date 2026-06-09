@@ -143,6 +143,30 @@ const BROWSER_AI_SESSION_OPTIONS = {
   expectedInputs: [{ type: "text", languages: ["ja", "en"] }],
   expectedOutputs: [{ type: "text", languages: ["ja"] }],
 };
+const LOCAL_AI_TASK_WORDS = [
+  "確認",
+  "対応",
+  "作成",
+  "共有",
+  "連絡",
+  "準備",
+  "整理",
+  "決める",
+  "登録",
+  "更新",
+  "提出",
+  "依頼",
+  "検討",
+  "チェック",
+  "修正",
+  "実装",
+  "保存",
+  "送信",
+  "予約",
+  "購入",
+  "調査",
+  "まとめる",
+];
 const DEFAULT_SORT_MODE = "updatedDesc";
 const SORT_MODES = new Set(["updatedDesc", "updatedAsc", "titleAsc", "titleDesc"]);
 const DEFAULT_DATE_VIEW = "active";
@@ -895,6 +919,136 @@ function appendAiSection(title, content) {
   return true;
 }
 
+function stripLocalAiMarkdown(text) {
+  return String(text || "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!\[[^\]]*]\([^)]+\)/g, " ")
+    .replace(/\[([^\]]+)]\([^)]+\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^[-*+]\s+\[[ xX]\]\s+/gm, "")
+    .replace(/^[-*+]\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/[_*~>#|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function shortenText(text, maxLength = 42) {
+  const cleaned = stripLocalAiMarkdown(text);
+  if (cleaned.length <= maxLength) return cleaned;
+  return `${cleaned.slice(0, maxLength - 1).trim()}…`;
+}
+
+function splitLocalAiSegments(text) {
+  return String(text || "")
+    .replace(/\r/g, "\n")
+    .split(/[\n。！？!?]+/u)
+    .map((segment) => stripLocalAiMarkdown(segment))
+    .filter((segment) => segment.length >= 4);
+}
+
+function scoreLocalAiSegment(segment, title = "") {
+  const lower = segment.toLowerCase();
+  let score = Math.min(segment.length, 80) / 8;
+  if (title && lower.includes(title.toLowerCase())) score += 10;
+  LOCAL_AI_TASK_WORDS.forEach((word) => {
+    if (segment.includes(word)) score += 5;
+  });
+  AUTO_TAG_DICTIONARY.forEach(({ keywords }) => {
+    keywords.forEach((keyword) => {
+      if (lower.includes(keyword.toLowerCase())) score += 2;
+    });
+  });
+  if (/[:：]$/.test(segment)) score -= 3;
+  return score;
+}
+
+function pickLocalAiSegments(body, title = "", limit = 3) {
+  const segments = splitLocalAiSegments(body);
+  return segments
+    .map((segment, index) => ({
+      segment,
+      index,
+      score: scoreLocalAiSegment(segment, title),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, limit)
+    .sort((a, b) => a.index - b.index)
+    .map((item) => item.segment);
+}
+
+function createLocalAiTitle(title, body) {
+  const heading = String(body || "").match(/^#{1,3}\s+(.+)$/m)?.[1];
+  const base = heading || pickLocalAiSegments(body, title, 1)[0] || title || "新しいノート";
+  const compact = shortenText(base.replace(/[、,].+$/, ""), 24);
+  if (compact.length >= 6) return compact;
+  const tags = generateAutoTags(title, body);
+  return tags.length ? `${tags[0]}ノート` : compact || "新しいノート";
+}
+
+function createLocalAiSummary(title, body) {
+  const segments = pickLocalAiSegments(body, title, 3);
+  if (segments.length === 0) return "- 要約できる本文がまだありません。";
+  return segments.map((segment) => `- ${shortenText(segment, 58)}`).join("\n");
+}
+
+function createLocalAiChecklist(title, body) {
+  const taskPattern = new RegExp(LOCAL_AI_TASK_WORDS.join("|"));
+  let segments = splitLocalAiSegments(body).filter((segment) => taskPattern.test(segment));
+  if (segments.length === 0) segments = pickLocalAiSegments(body, title, 4);
+  if (segments.length === 0) return "- [ ] ノート内容を確認する";
+  return segments
+    .slice(0, 6)
+    .map((segment) => `- [ ] ${shortenText(segment, 52)}`)
+    .join("\n");
+}
+
+function createLocalAiPolish(title, body) {
+  const lines = String(body || "")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return "本文を入力すると、ここに整形案を作成します。";
+
+  const normalizedLines = lines.map((line) => {
+    if (/^[-*+]\s+/.test(line) || /^#{1,6}\s+/.test(line) || /^- \[[ xX]\]/.test(line)) {
+      return line;
+    }
+    if (/^[・･]\s*/.test(line)) return `- ${line.replace(/^[・･]\s*/, "")}`;
+    return line.replace(/\s+/g, " ");
+  });
+
+  const needsHeading = title && !normalizedLines.some((line) => /^#{1,6}\s+/.test(line));
+  return [
+    needsHeading ? `## ${shortenText(title, 36)}` : "",
+    ...normalizedLines,
+  ].filter(Boolean).join("\n");
+}
+
+function createLocalBrowserAiResult(action) {
+  const title = titleInput?.value.trim() || "";
+  const body = bodyInput?.value.trim() || "";
+
+  if (action === "title") return createLocalAiTitle(title, body);
+  if (action === "summary") return createLocalAiSummary(title, body);
+  if (action === "tags") {
+    const generated = generateAutoTags(title, body);
+    if (generated.length > 0) return generated.join(", ");
+    return pickLocalAiSegments(body, title, 2)
+      .flatMap((segment) => segment.split(/[\s,、。．，.!?！？:：;；()[\]{}<>「」『』【】《》\/\\|]+/u))
+      .map(cleanAutoTag)
+      .filter((tag) => tag.length >= 2 && tag.length <= TAG_MAX_LENGTH)
+      .slice(0, AUTO_TAG_LIMIT)
+      .join(", ");
+  }
+  if (action === "checklist") return createLocalAiChecklist(title, body);
+  if (action === "polish") return createLocalAiPolish(title, body);
+  return "";
+}
+
 async function getBrowserAiAvailability(model) {
   if (!model?.availability) return "unavailable";
   try {
@@ -982,9 +1136,14 @@ async function checkBrowserAiAvailability() {
   setBrowserAiStatus("ブラウザAIを確認しています。", "working");
 
   try {
+    const model = getBrowserLanguageModel();
+    if (!model?.create) {
+      setBrowserAiStatus("通常版Edgeでも使える軽量ブラウザAIで利用できます。外部送信なしで端末内処理します。", "ready");
+      return;
+    }
     await ensureBrowserAiSession();
   } catch (error) {
-    setBrowserAiStatus(error?.message || "ブラウザAIの確認に失敗しました。", "error");
+    setBrowserAiStatus("組み込みAIは利用できませんが、軽量ブラウザAIで利用できます。外部送信なしで端末内処理します。", "ready");
   } finally {
     setBrowserAiBusy(false);
   }
@@ -1012,27 +1171,42 @@ async function runBrowserAiAction(action) {
   setBrowserAiStatus("AIで作成しています。", "working");
 
   try {
-    const result = await promptBrowserAi(prompts[action]);
+    let usedLocalFallback = false;
+    let result = "";
+
+    if (getBrowserLanguageModel()?.create) {
+      try {
+        result = await promptBrowserAi(prompts[action]);
+      } catch {
+        result = createLocalBrowserAiResult(action);
+        usedLocalFallback = true;
+      }
+    } else {
+      result = createLocalBrowserAiResult(action);
+      usedLocalFallback = true;
+    }
+
+    const statusPrefix = usedLocalFallback ? "軽量AIで" : "";
 
     if (action === "title") {
       const title = cleanAiTitle(result);
       if (!title) throw new Error("タイトルを作成できませんでした。");
       titleInput.value = title;
       dispatchEditorInputEvents();
-      setBrowserAiStatus("タイトルを作成しました。", "ready");
+      setBrowserAiStatus(`${statusPrefix}タイトルを作成しました。`, "ready");
     } else if (action === "tags") {
       const aiTags = extractAiTags(result);
       if (aiTags.length === 0) throw new Error("タグ候補を作成できませんでした。");
       tagsInput.value = mergeTags(tagsInput.value, aiTags);
       dispatchEditorInputEvents();
       showTagSuggestions();
-      setBrowserAiStatus(`${aiTags.length}件のAIタグを追加しました。`, "ready");
+      setBrowserAiStatus(`${statusPrefix}${aiTags.length}件のAIタグを追加しました。`, "ready");
     } else if (action === "summary") {
-      if (appendAiSection("AI要約", result)) setBrowserAiStatus("要約を本文に追加しました。", "ready");
+      if (appendAiSection("AI要約", result)) setBrowserAiStatus(`${statusPrefix}要約を本文に追加しました。`, "ready");
     } else if (action === "checklist") {
-      if (appendAiSection("AIチェックリスト", result)) setBrowserAiStatus("チェックリストを本文に追加しました。", "ready");
+      if (appendAiSection("AIチェックリスト", result)) setBrowserAiStatus(`${statusPrefix}チェックリストを本文に追加しました。`, "ready");
     } else if (action === "polish") {
-      if (appendAiSection("AI整形案", result)) setBrowserAiStatus("整形案を本文に追加しました。", "ready");
+      if (appendAiSection("AI整形案", result)) setBrowserAiStatus(`${statusPrefix}整形案を本文に追加しました。`, "ready");
     }
   } catch (error) {
     const message = error?.name === "NotSupportedError"

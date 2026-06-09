@@ -10,10 +10,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="NoteDesk">
     <title>NoteDesk | Notes</title>
-    <link rel="manifest" href="manifest.webmanifest?v=19">
+    <link rel="manifest" href="manifest.webmanifest?v=20">
     <link rel="icon" href="icons/icon.svg?v=2" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/icon-192.png?v=2">
-    <link rel="stylesheet" href="styles.css?v=19">
+    <link rel="stylesheet" href="styles.css?v=20">
   </head>
   <body>
     <main id="appScreen" class="app" hidden>
@@ -75,7 +75,7 @@
             <div class="browser-ai-header">
               <div>
                 <h2 id="browserAiTitle">ブラウザAI</h2>
-                <p id="browserAiStatus" aria-live="polite">対応ブラウザではノート内容を端末内で処理できます。EdgeはCanary/Dev版の設定が必要な場合があります。</p>
+                <p id="browserAiStatus" aria-live="polite">通常版Edgeでも軽量ブラウザAIで端末内処理できます。本格AI対応ブラウザでは自動で切り替わります。</p>
               </div>
               <button type="button" class="secondary" id="browserAiCheckButton">確認</button>
             </div>
@@ -271,7 +271,7 @@
               <img src="images/help-browser-ai.svg?v=1" alt="ブラウザAIでタイトル、要約、タグ、チェックリスト、文章整形を実行する画面">
               <div>
                 <h3 id="helpAiTitle">ブラウザAI</h3>
-                <p>対応ブラウザでは端末内のAIでタイトル作成、要約、タグ提案、チェックリスト化、文章整形ができます。EdgeはCanary/Dev版でPrompt APIを有効化する必要があります。</p>
+                <p>通常版Edgeでは軽量ブラウザAIでタイトル作成、要約、タグ提案、チェックリスト化、文章整形ができます。本格AI対応ブラウザでは端末内モデルへ自動切替します。</p>
               </div>
             </section>
           </div>
@@ -401,7 +401,7 @@
 
           <div class="settings-section">
             <h3>ブラウザAI</h3>
-            <p class="muted">Chrome/Edgeなどの対応ブラウザでは、ノート本文を外部サーバーへ送らず端末内のAIで処理します。EdgeはCanary/Dev版 138.0.3309.2以降で edge://flags の「Prompt API for Phi mini」をEnabledにしてください。</p>
+            <p class="muted">通常版EdgeではNoteDesk内の軽量ブラウザAIで処理します。Chrome/EdgeのPrompt API対応環境では端末内モデルへ自動切替します。どちらもノート本文を外部サーバーへ送信しません。</p>
           </div>
 
           <div class="settings-section">
@@ -435,7 +435,7 @@
       </article>
     </div>
 
-    <script type="module" src="app.js?v=19"></script>
-    <script src="pwa.js?v=19"></script>
+    <script type="module" src="app.js?v=20"></script>
+    <script src="pwa.js?v=20"></script>
   </body>
 </html>

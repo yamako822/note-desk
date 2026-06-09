@@ -425,6 +425,37 @@ test.describe('NoteDesk E2E', () => {
     await expect(page.locator('#memoBody')).toHaveValue(/## AI要約/);
   });
 
+  test('browser AI falls back to lightweight local mode without LanguageModel', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'LanguageModel', {
+        configurable: true,
+        value: undefined
+      });
+      Object.defineProperty(window, 'ai', {
+        configurable: true,
+        value: undefined
+      });
+    });
+
+    await page.goto('/memo.html');
+    await page.waitForSelector('#memoBody');
+    await page.fill('#memoBody', '今年の改善業務を整理して、優先順位を決める。資料を共有して、担当者へ連絡する。');
+
+    await page.click('#browserAiCheckButton');
+    await expect(page.locator('#browserAiStatus')).toContainText('軽量ブラウザAI');
+
+    await page.click('[data-ai-action="title"]');
+    await expect(page.locator('#memoTitle')).not.toHaveValue('');
+    await expect(page.locator('#browserAiStatus')).toContainText('軽量AIでタイトル');
+
+    await page.click('[data-ai-action="tags"]');
+    await expect(page.locator('#memoTags')).toHaveValue(/仕事|資料|重要|改善/);
+
+    await page.click('[data-ai-action="checklist"]');
+    await expect(page.locator('#memoBody')).toHaveValue(/## AIチェックリスト/);
+    await expect(page.locator('#memoBody')).toHaveValue(/- \[ \]/);
+  });
+
   test('tag filter opens dialog and filters by selected tag', async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('note-desk-local-notes', JSON.stringify([
