@@ -34,6 +34,7 @@ https://yamako822.github.io/note-desk/local.html
 ## ブラウザAI
 
 - Chrome/Edgeなどの対応ブラウザで、端末内のAIを使います。
+- Edgeは通常版では未対応の場合があります。Microsoft公式のPrompt APIは、Edge Canary/Dev 138.0.3309.2以降で `edge://flags` の「Prompt API for Phi mini」を有効化して使います。
 - ノート内容は外部APIへ送信しません。
 - 初回はブラウザがAIモデルを準備するため、ダウンロードや数分の待ち時間が発生する場合があります。
 - 未対応ブラウザやスマホでは、AI欄に利用不可の案内が表示されます。

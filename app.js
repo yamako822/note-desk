@@ -780,6 +780,24 @@ function getBrowserLanguageModel() {
   return window.LanguageModel || window.ai?.languageModel || null;
 }
 
+function isMicrosoftEdge() {
+  return /\bEdg\//.test(navigator.userAgent || "");
+}
+
+function getBrowserAiUnavailableMessage() {
+  if (isMicrosoftEdge()) {
+    return "Edge通常版では未対応の場合があります。Edge Canary/Dev 138.0.3309.2以降で edge://flags の「Prompt API for Phi mini」をEnabledにしてください。";
+  }
+  return "このブラウザではブラウザAIを利用できません。Chrome/Edgeの対応版で試してください。";
+}
+
+function getBrowserAiDeviceUnavailableMessage() {
+  if (isMicrosoftEdge()) {
+    return "この端末ではEdgeのブラウザAIを利用できません。Edge Canary/Devで edge://on-device-internals を開き、Device performance class が High 以上か確認してください。";
+  }
+  return "この端末ではブラウザAIを利用できません。PC版Chrome/Edge、十分な空き容量とメモリが必要です。";
+}
+
 function setBrowserAiStatus(message, state = "") {
   if (browserAiStatus) browserAiStatus.textContent = message;
   if (browserAiPanel) {
@@ -924,12 +942,12 @@ async function ensureBrowserAiSession() {
 
   const model = getBrowserLanguageModel();
   if (!model?.create) {
-    throw new Error("このブラウザではブラウザAIを利用できません。Chrome/Edgeの対応版で試してください。");
+    throw new Error(getBrowserAiUnavailableMessage());
   }
 
   const availability = await getBrowserAiAvailability(model);
   if (availability === "unavailable") {
-    throw new Error("この端末ではブラウザAIを利用できません。PC版Chrome/Edge、十分な空き容量とメモリが必要です。");
+    throw new Error(getBrowserAiDeviceUnavailableMessage());
   }
 
   if (availability === "downloadable") {
@@ -1018,7 +1036,7 @@ async function runBrowserAiAction(action) {
     }
   } catch (error) {
     const message = error?.name === "NotSupportedError"
-      ? "日本語のブラウザAIに対応していない環境です。Chrome/Edgeの対応版で試してください。"
+      ? "日本語のブラウザAIに対応していない環境です。Edgeの場合はCanary/Dev版とPrompt API for Phi mini設定を確認してください。"
       : error?.message || "AI処理に失敗しました。少し短い本文で試してください。";
     setBrowserAiStatus(message, "error");
   } finally {
