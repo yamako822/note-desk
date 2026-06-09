@@ -21,6 +21,9 @@ const loginScreen = document.querySelector("#loginScreen");
 const appScreen = document.querySelector("#appScreen");
 const appLoading = document.querySelector("#appLoading");
 const mobileSectionTabs = document.querySelectorAll("[data-mobile-view]");
+const mobileOrganizeToggle = document.querySelector("#mobileOrganizeToggle");
+const mobileSidebarBackdrop = document.querySelector("#mobileSidebarBackdrop");
+const mobileSidebarCloseButton = document.querySelector("#mobileSidebarCloseButton");
 const googleLoginButton = document.querySelector("#googleLoginButton");
 const emailAuthForm = document.querySelector("#emailAuthForm");
 const emailInput = document.querySelector("#emailInput");
@@ -140,7 +143,7 @@ const NOTEBOOK_MAX_LENGTH = 32;
 const DEFAULT_NOTEBOOK = "未分類";
 const DEFAULT_NOTEBOOKS = ["未分類", "仕事", "学習", "個人", "議事録", "アイデア", "タスク"];
 const NOTE_TYPES = new Set(["text", "checklist"]);
-const MOBILE_VIEW_MODES = new Set(["library", "editor", "sidebar"]);
+const MOBILE_VIEW_MODES = new Set(["library", "editor"]);
 const AUTO_TAG_LIMIT = 5;
 const ATTACHMENT_LIMIT = 3;
 const ATTACHMENT_MAX_BYTES = 220 * 1024;
@@ -307,6 +310,7 @@ let activeNotebook = "all";
 let dateViewMode = DEFAULT_DATE_VIEW;
 let emailAuthMode = "signin";
 let mobileViewMode = readMobileViewMode();
+let mobileSidebarOpen = false;
 let showFavoritesOnly = false;
 let openMemoId = null;
 let currentPage = 1;
@@ -391,7 +395,26 @@ function applyMobileView(mode = mobileViewMode, { persist = false, scrollTop = f
   }
 }
 
+function setMobileSidebarOpen(isOpen) {
+  if (!isMemoPage || !appScreen) return;
+
+  mobileSidebarOpen = Boolean(isOpen) && isMobileViewport();
+  appScreen.dataset.sidebarOpen = mobileSidebarOpen ? "true" : "false";
+  if (mobileSidebarBackdrop) mobileSidebarBackdrop.hidden = !mobileSidebarOpen;
+  if (mobileOrganizeToggle) {
+    mobileOrganizeToggle.setAttribute("aria-expanded", String(mobileSidebarOpen));
+    mobileOrganizeToggle.setAttribute("aria-label", mobileSidebarOpen ? "整理メニューを閉じる" : "整理メニューを開く");
+    mobileOrganizeToggle.textContent = mobileSidebarOpen ? "‹" : "›";
+  }
+  document.body.classList.toggle("mobile-sidebar-open", mobileSidebarOpen);
+}
+
+function toggleMobileSidebar() {
+  setMobileSidebarOpen(!mobileSidebarOpen);
+}
+
 function showMobileView(mode, options = {}) {
+  setMobileSidebarOpen(false);
   applyMobileView(mode, { persist: true, scrollTop: true, ...options });
 }
 
@@ -3268,13 +3291,23 @@ function bindLoginPage() {
 
 function bindMemoPage() {
   applyMobileView(mobileViewMode);
+  setMobileSidebarOpen(false);
   applySafeModeSetting();
   mobileSectionTabs.forEach((button) => {
     button.addEventListener("click", () => {
       showMobileView(button.dataset.mobileView);
     });
   });
-  window.addEventListener("resize", () => applyMobileView(mobileViewMode));
+  mobileOrganizeToggle?.addEventListener("click", toggleMobileSidebar);
+  mobileSidebarBackdrop?.addEventListener("click", () => setMobileSidebarOpen(false));
+  mobileSidebarCloseButton?.addEventListener("click", () => setMobileSidebarOpen(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && mobileSidebarOpen) setMobileSidebarOpen(false);
+  });
+  window.addEventListener("resize", () => {
+    if (!isMobileViewport()) setMobileSidebarOpen(false);
+    applyMobileView(mobileViewMode);
+  });
   usernameForm.addEventListener("submit", updateUsername);
   feedbackButton.addEventListener("click", openFeedbackForm);
   logoutButton.addEventListener("click", logout);

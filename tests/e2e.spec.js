@@ -649,6 +649,8 @@ test.describe('NoteDesk E2E', () => {
     expect(mobile.scrollWidth).toBeLessThanOrEqual(mobile.viewportWidth);
     expect(mobile.gridColumns.split(' ').length).toBe(1);
     await expect(page.locator('.mobile-section-tabs')).toBeVisible();
+    await expect(page.locator('.mobile-section-tabs [data-mobile-view]')).toHaveCount(2);
+    await expect(page.locator('#mobileOrganizeToggle')).toBeVisible();
     await expect(page.locator('.library')).toBeVisible();
     await expect(page.locator('.editor')).toBeHidden();
     await expect(page.locator('.workspace-sidebar')).toBeHidden();
@@ -657,9 +659,14 @@ test.describe('NoteDesk E2E', () => {
     await expect(page.locator('.editor')).toBeVisible();
     await expect(page.locator('.library')).toBeHidden();
 
-    await page.click('[data-mobile-view="sidebar"]');
+    await page.click('#mobileOrganizeToggle');
     await expect(page.locator('.workspace-sidebar')).toBeVisible();
-    await expect(page.locator('.editor')).toBeHidden();
+    await expect(page.locator('#mobileOrganizeToggle')).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#mobileSidebarBackdrop')).toBeVisible();
+
+    await page.click('#mobileSidebarCloseButton');
+    await expect(page.locator('.workspace-sidebar')).toBeHidden();
+    await expect(page.locator('#mobileOrganizeToggle')).toHaveAttribute('aria-expanded', 'false');
 
     await page.click('[data-mobile-view="library"]');
     await page.click('#newMemoButton');
