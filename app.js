@@ -176,16 +176,16 @@ const NOTE_TEMPLATES = {
   },
 };
 const DEFAULT_LIGHT_COLORS = {
-  accent: "#0f766e",
-  bg: "#f7f5f0",
+  accent: "#7c3aed",
+  bg: "#faf7ff",
   text: "#202124",
-  cardBg: "#fffefb",
+  cardBg: "#fffaff",
 };
 const DEFAULT_DARK_COLORS = {
-  accent: "#4cc9b8",
-  bg: "#111715",
+  accent: "#c4b5fd",
+  bg: "#15101f",
   text: "#eef3f1",
-  cardBg: "#17211e",
+  cardBg: "#1f172c",
 };
 const AUTO_TAG_DICTIONARY = [
   { tag: "仕事", keywords: ["仕事", "業務", "会議", "打合せ", "打ち合わせ", "mtg", "見積", "依頼", "タスク", "todo", "締切", "顧客", "案件"] },
