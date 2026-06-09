@@ -8,6 +8,9 @@ const LOCAL_ENTRY_KEY = "note-desk-local-entry";
 const LOCAL_MEMOS_KEY = "note-desk-local-notes";
 const LOCAL_DISPLAY_NAME_KEY = "note-desk-local-display-name";
 const MOBILE_VIEW_SETTING_KEY = "note-desk-mobile-view";
+const WORKSPACE_MODE_SETTING_KEY = "note-desk-workspace-mode";
+const WORKSPACE_POSITION_SETTING_KEY = "note-desk-workspace-position";
+const CONTENT_LAYOUT_SETTING_KEY = "note-desk-content-layout";
 const DRAFT_KEY = "note-desk-draft";
 const CUSTOM_COLORS_KEY = "note-desk-custom-colors";
 const LAYOUT_SETTING_KEY = "note-desk-layout-setting";
@@ -24,6 +27,11 @@ const mobileSectionTabs = document.querySelectorAll("[data-mobile-view]");
 const mobileOrganizeToggle = document.querySelector("#mobileOrganizeToggle");
 const mobileSidebarBackdrop = document.querySelector("#mobileSidebarBackdrop");
 const mobileSidebarCloseButton = document.querySelector("#mobileSidebarCloseButton");
+const workspaceToggleButton = document.querySelector("#workspaceToggleButton");
+const workspaceModeSelect = document.querySelector("#workspaceModeSelect");
+const workspacePositionSelect = document.querySelector("#workspacePositionSelect");
+const contentLayoutSelect = document.querySelector("#contentLayoutSelect");
+const ribbonListLayoutSelect = document.querySelector("#ribbonListLayoutSelect");
 const googleLoginButton = document.querySelector("#googleLoginButton");
 const emailAuthForm = document.querySelector("#emailAuthForm");
 const emailInput = document.querySelector("#emailInput");
@@ -144,6 +152,9 @@ const DEFAULT_NOTEBOOK = "未分類";
 const DEFAULT_NOTEBOOKS = ["未分類", "仕事", "学習", "個人", "議事録", "アイデア", "タスク"];
 const NOTE_TYPES = new Set(["text", "checklist"]);
 const MOBILE_VIEW_MODES = new Set(["library", "editor"]);
+const WORKSPACE_MODES = new Set(["fixed", "slide"]);
+const WORKSPACE_POSITIONS = new Set(["left", "right", "top"]);
+const CONTENT_LAYOUT_MODES = new Set(["listEditor", "editorList", "stacked"]);
 const AUTO_TAG_LIMIT = 5;
 const ATTACHMENT_LIMIT = 3;
 const ATTACHMENT_MAX_BYTES = 220 * 1024;
@@ -310,6 +321,9 @@ let activeNotebook = "all";
 let dateViewMode = DEFAULT_DATE_VIEW;
 let emailAuthMode = "signin";
 let mobileViewMode = readMobileViewMode();
+let workspaceMode = readWorkspaceMode();
+let workspacePosition = readWorkspacePosition();
+let contentLayoutMode = readContentLayoutMode();
 let mobileSidebarOpen = false;
 let showFavoritesOnly = false;
 let openMemoId = null;
@@ -377,6 +391,68 @@ function isMobileViewport() {
   return window.matchMedia("(max-width: 960px)").matches;
 }
 
+function readWorkspaceMode() {
+  const saved = localStorage.getItem(WORKSPACE_MODE_SETTING_KEY);
+  return WORKSPACE_MODES.has(saved) ? saved : "fixed";
+}
+
+function saveWorkspaceMode(mode) {
+  try {
+    localStorage.setItem(WORKSPACE_MODE_SETTING_KEY, mode);
+  } catch {}
+}
+
+function readWorkspacePosition() {
+  const saved = localStorage.getItem(WORKSPACE_POSITION_SETTING_KEY);
+  return WORKSPACE_POSITIONS.has(saved) ? saved : "left";
+}
+
+function saveWorkspacePosition(position) {
+  try {
+    localStorage.setItem(WORKSPACE_POSITION_SETTING_KEY, position);
+  } catch {}
+}
+
+function readContentLayoutMode() {
+  const saved = localStorage.getItem(CONTENT_LAYOUT_SETTING_KEY);
+  return CONTENT_LAYOUT_MODES.has(saved) ? saved : "listEditor";
+}
+
+function saveContentLayoutMode(mode) {
+  try {
+    localStorage.setItem(CONTENT_LAYOUT_SETTING_KEY, mode);
+  } catch {}
+}
+
+function applyWorkspaceLayout({ persist = false } = {}) {
+  if (!isMemoPage || !appScreen) return;
+
+  workspaceMode = WORKSPACE_MODES.has(workspaceMode) ? workspaceMode : "fixed";
+  workspacePosition = WORKSPACE_POSITIONS.has(workspacePosition) ? workspacePosition : "left";
+  contentLayoutMode = CONTENT_LAYOUT_MODES.has(contentLayoutMode) ? contentLayoutMode : "listEditor";
+
+  appScreen.dataset.workspaceMode = workspaceMode;
+  appScreen.dataset.workspacePosition = workspacePosition;
+  appScreen.dataset.contentLayout = contentLayoutMode;
+  appScreen.dataset.workspaceOpen = workspaceMode === "fixed" ? "true" : String(mobileSidebarOpen);
+
+  if (workspaceModeSelect) workspaceModeSelect.value = workspaceMode;
+  if (workspacePositionSelect) workspacePositionSelect.value = workspacePosition;
+  if (contentLayoutSelect) contentLayoutSelect.value = contentLayoutMode;
+  if (workspaceToggleButton) {
+    workspaceToggleButton.setAttribute("aria-expanded", appScreen.dataset.workspaceOpen);
+    workspaceToggleButton.textContent = workspaceMode === "fixed"
+      ? "固定中"
+      : (mobileSidebarOpen ? "整理を閉じる" : "整理を開く");
+  }
+
+  if (persist) {
+    saveWorkspaceMode(workspaceMode);
+    saveWorkspacePosition(workspacePosition);
+    saveContentLayoutMode(contentLayoutMode);
+  }
+}
+
 function applyMobileView(mode = mobileViewMode, { persist = false, scrollTop = false } = {}) {
   if (!isMemoPage || !appScreen) return;
 
@@ -398,18 +474,38 @@ function applyMobileView(mode = mobileViewMode, { persist = false, scrollTop = f
 function setMobileSidebarOpen(isOpen) {
   if (!isMemoPage || !appScreen) return;
 
-  mobileSidebarOpen = Boolean(isOpen) && isMobileViewport();
+  const canUseDrawer = isMobileViewport() || workspaceMode === "slide";
+  mobileSidebarOpen = Boolean(isOpen) && canUseDrawer;
   appScreen.dataset.sidebarOpen = mobileSidebarOpen ? "true" : "false";
+  appScreen.dataset.workspaceOpen = workspaceMode === "fixed" ? "true" : String(mobileSidebarOpen);
   if (mobileSidebarBackdrop) mobileSidebarBackdrop.hidden = !mobileSidebarOpen;
   if (mobileOrganizeToggle) {
     mobileOrganizeToggle.setAttribute("aria-expanded", String(mobileSidebarOpen));
     mobileOrganizeToggle.setAttribute("aria-label", mobileSidebarOpen ? "整理メニューを閉じる" : "整理メニューを開く");
     mobileOrganizeToggle.textContent = mobileSidebarOpen ? "‹" : "›";
   }
+  if (workspaceToggleButton) {
+    workspaceToggleButton.setAttribute("aria-expanded", appScreen.dataset.workspaceOpen);
+    workspaceToggleButton.textContent = workspaceMode === "fixed"
+      ? "固定中"
+      : (mobileSidebarOpen ? "整理を閉じる" : "整理を開く");
+  }
   document.body.classList.toggle("mobile-sidebar-open", mobileSidebarOpen);
 }
 
 function toggleMobileSidebar() {
+  setMobileSidebarOpen(!mobileSidebarOpen);
+}
+
+function toggleWorkspacePanel() {
+  if (workspaceMode === "fixed") {
+    workspaceMode = "slide";
+    mobileSidebarOpen = false;
+    applyWorkspaceLayout({ persist: true });
+    setMobileSidebarOpen(false);
+    return;
+  }
+
   setMobileSidebarOpen(!mobileSidebarOpen);
 }
 
@@ -1493,6 +1589,7 @@ function applyLayoutSetting(layout) {
   }
   if (layoutGridRadio) layoutGridRadio.checked = layout === "grid";
   if (layoutListRadio) layoutListRadio.checked = layout === "list";
+  if (ribbonListLayoutSelect) ribbonListLayoutSelect.value = layout;
 }
 
 function padDatePart(value) {
@@ -3290,6 +3387,7 @@ function bindLoginPage() {
 }
 
 function bindMemoPage() {
+  applyWorkspaceLayout();
   applyMobileView(mobileViewMode);
   setMobileSidebarOpen(false);
   applySafeModeSetting();
@@ -3299,14 +3397,35 @@ function bindMemoPage() {
     });
   });
   mobileOrganizeToggle?.addEventListener("click", toggleMobileSidebar);
+  workspaceToggleButton?.addEventListener("click", toggleWorkspacePanel);
+  workspaceModeSelect?.addEventListener("change", () => {
+    workspaceMode = WORKSPACE_MODES.has(workspaceModeSelect.value) ? workspaceModeSelect.value : "fixed";
+    mobileSidebarOpen = false;
+    applyWorkspaceLayout({ persist: true });
+    setMobileSidebarOpen(false);
+  });
+  workspacePositionSelect?.addEventListener("change", () => {
+    workspacePosition = WORKSPACE_POSITIONS.has(workspacePositionSelect.value) ? workspacePositionSelect.value : "left";
+    applyWorkspaceLayout({ persist: true });
+  });
+  contentLayoutSelect?.addEventListener("change", () => {
+    contentLayoutMode = CONTENT_LAYOUT_MODES.has(contentLayoutSelect.value) ? contentLayoutSelect.value : "listEditor";
+    applyWorkspaceLayout({ persist: true });
+  });
+  ribbonListLayoutSelect?.addEventListener("change", () => {
+    layoutSetting = ribbonListLayoutSelect.value === "list" ? "list" : "grid";
+    applyLayoutSetting(layoutSetting);
+    saveLayoutSetting(layoutSetting);
+  });
   mobileSidebarBackdrop?.addEventListener("click", () => setMobileSidebarOpen(false));
   mobileSidebarCloseButton?.addEventListener("click", () => setMobileSidebarOpen(false));
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && mobileSidebarOpen) setMobileSidebarOpen(false);
   });
   window.addEventListener("resize", () => {
-    if (!isMobileViewport()) setMobileSidebarOpen(false);
+    if (!isMobileViewport() && workspaceMode !== "slide") setMobileSidebarOpen(false);
     applyMobileView(mobileViewMode);
+    applyWorkspaceLayout();
   });
   usernameForm.addEventListener("submit", updateUsername);
   feedbackButton.addEventListener("click", openFeedbackForm);

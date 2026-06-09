@@ -299,12 +299,94 @@ label {
 .app {
   display: grid;
   grid-template-columns: minmax(220px, 0.48fr) minmax(420px, 1.1fr) minmax(400px, 0.95fr);
-  grid-template-areas: "sidebar library editor";
+  grid-template-areas:
+    "ribbon ribbon ribbon"
+    "sidebar library editor";
   gap: 18px;
   width: min(1820px, calc(100% - clamp(24px, 4vw, 72px)));
   margin: 32px auto;
   align-items: start;
   filter: brightness(var(--app-brightness));
+}
+
+.app[data-workspace-position="right"] {
+  grid-template-columns: minmax(420px, 1.1fr) minmax(400px, 0.95fr) minmax(220px, 0.48fr);
+  grid-template-areas:
+    "ribbon ribbon ribbon"
+    "library editor sidebar";
+}
+
+.app[data-workspace-position="top"] {
+  grid-template-columns: minmax(420px, 1.1fr) minmax(400px, 0.95fr);
+  grid-template-areas:
+    "ribbon ribbon"
+    "sidebar sidebar"
+    "library editor";
+}
+
+.app[data-content-layout="editorList"] {
+  grid-template-areas:
+    "ribbon ribbon ribbon"
+    "sidebar editor library";
+}
+
+.app[data-workspace-position="right"][data-content-layout="editorList"] {
+  grid-template-areas:
+    "ribbon ribbon ribbon"
+    "editor library sidebar";
+}
+
+.app[data-workspace-position="top"][data-content-layout="editorList"] {
+  grid-template-areas:
+    "ribbon ribbon"
+    "sidebar sidebar"
+    "editor library";
+}
+
+.app[data-content-layout="stacked"] {
+  grid-template-columns: minmax(220px, 0.38fr) minmax(0, 1fr);
+  grid-template-areas:
+    "ribbon ribbon"
+    "sidebar library"
+    "sidebar editor";
+}
+
+.app[data-workspace-position="right"][data-content-layout="stacked"] {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.38fr);
+  grid-template-areas:
+    "ribbon ribbon"
+    "library sidebar"
+    "editor sidebar";
+}
+
+.app[data-workspace-position="top"][data-content-layout="stacked"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "ribbon"
+    "sidebar"
+    "library"
+    "editor";
+}
+
+.app[data-workspace-mode="slide"] {
+  grid-template-columns: minmax(420px, 1.1fr) minmax(400px, 0.95fr);
+  grid-template-areas:
+    "ribbon ribbon"
+    "library editor";
+}
+
+.app[data-workspace-mode="slide"][data-content-layout="editorList"] {
+  grid-template-areas:
+    "ribbon ribbon"
+    "editor library";
+}
+
+.app[data-workspace-mode="slide"][data-content-layout="stacked"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "ribbon"
+    "library"
+    "editor";
 }
 
 .workspace-sidebar,
@@ -314,6 +396,78 @@ label {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
+}
+
+.app-ribbon {
+  grid-area: ribbon;
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--panel) 94%, var(--soft));
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.ribbon-group {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  min-width: max-content;
+  border-right: 1px solid var(--line);
+  padding-right: 10px;
+}
+
+.ribbon-group:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+.ribbon-title {
+  align-self: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.ribbon-field {
+  display: grid;
+  gap: 3px;
+  min-width: 104px;
+}
+
+.ribbon-field span {
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.ribbon-group button,
+.ribbon-group select,
+.ribbon-group input {
+  min-height: 38px;
+}
+
+.ribbon-group select {
+  min-width: 116px;
+  padding: 8px 32px 8px 10px;
+  font-size: 13px;
+}
+
+.ribbon-group-filter {
+  flex: 1 0 auto;
+}
+
+.ribbon-group-filter input {
+  width: clamp(150px, 18vw, 260px);
 }
 
 .workspace-sidebar {
@@ -338,6 +492,64 @@ label {
   grid-area: library;
   min-height: calc(100vh - 64px);
   padding: 22px;
+}
+
+@media (min-width: 961px) {
+  .app[data-workspace-mode="slide"] > .workspace-sidebar {
+    position: fixed;
+    z-index: 82;
+    display: grid;
+    width: min(340px, 88vw);
+    min-height: 0;
+    max-height: none;
+    border-radius: 0 8px 8px 0;
+    visibility: hidden;
+    transform: translateX(calc(-100% - 18px));
+    transition: transform 180ms ease, visibility 180ms ease;
+  }
+
+  .app[data-workspace-mode="slide"][data-workspace-position="left"] > .workspace-sidebar {
+    top: 0;
+    bottom: 0;
+    left: 0;
+  }
+
+  .app[data-workspace-mode="slide"][data-workspace-position="right"] > .workspace-sidebar {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    border-radius: 8px 0 0 8px;
+    transform: translateX(calc(100% + 18px));
+  }
+
+  .app[data-workspace-mode="slide"][data-workspace-position="top"] > .workspace-sidebar {
+    top: 0;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: min(980px, calc(100vw - 48px));
+    max-height: 68dvh;
+    border-radius: 0 0 8px 8px;
+    transform: translate(-50%, calc(-100% - 18px));
+  }
+
+  .app[data-workspace-mode="slide"][data-workspace-open="true"] > .workspace-sidebar {
+    visibility: visible;
+    transform: translateX(0);
+  }
+
+  .app[data-workspace-mode="slide"][data-workspace-position="top"][data-workspace-open="true"] > .workspace-sidebar {
+    transform: translate(-50%, 0);
+  }
+
+  .app[data-workspace-mode="slide"][data-workspace-open="true"] > .mobile-sidebar-backdrop:not([hidden]) {
+    position: fixed;
+    inset: 0;
+    z-index: 81;
+    display: block;
+    background: rgba(0, 0, 0, 0.24);
+  }
 }
 
 .sidebar-brand {
@@ -1936,6 +2148,7 @@ mark {
   .app {
     grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
     grid-template-areas:
+      "ribbon ribbon"
       "sidebar library"
       "editor editor";
     width: min(100% - 24px, 1120px);
@@ -1953,7 +2166,9 @@ mark {
 @media (max-width: 960px) {
   .app {
     grid-template-columns: 1fr;
-    grid-template-areas: "library";
+    grid-template-areas:
+      "ribbon"
+      "library";
     margin: 0 auto;
     width: min(100%, 720px);
     gap: 0;
@@ -1961,7 +2176,35 @@ mark {
   }
 
   .app[data-mobile-view="editor"] {
-    grid-template-areas: "editor";
+    grid-template-areas:
+      "ribbon"
+      "editor";
+  }
+
+  .app-ribbon {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    margin-bottom: 10px;
+    padding: 8px;
+  }
+
+  .ribbon-group {
+    align-items: end;
+    gap: 6px;
+    padding-right: 8px;
+  }
+
+  .ribbon-title {
+    display: none;
+  }
+
+  .ribbon-field {
+    min-width: 96px;
+  }
+
+  .ribbon-group-filter input {
+    width: 150px;
   }
 
   .mobile-section-tabs {

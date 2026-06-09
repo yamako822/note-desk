@@ -27,6 +27,10 @@ test.describe('NoteDesk E2E', () => {
       localStorage.removeItem('note-desk-safe-mode');
       localStorage.removeItem('note-desk-ai-mode');
       localStorage.removeItem('note-desk-mobile-view');
+      localStorage.removeItem('note-desk-workspace-mode');
+      localStorage.removeItem('note-desk-workspace-position');
+      localStorage.removeItem('note-desk-content-layout');
+      localStorage.removeItem('note-desk-layout-setting');
     });
   });
 
@@ -602,6 +606,42 @@ test.describe('NoteDesk E2E', () => {
     expect(buttonStyle.whiteSpace).toBe('nowrap');
     expect(buttonStyle.wordBreak).toBe('keep-all');
     expect(buttonStyle.width).toBeGreaterThan(buttonStyle.height);
+  });
+
+  test('ribbon controls workspace docking and note list layout', async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto('/memo.html');
+    await page.waitForSelector('.app-ribbon');
+
+    await expect(page.locator('#workspaceModeSelect')).toHaveValue('fixed');
+    await expect(page.locator('#workspacePositionSelect')).toHaveValue('left');
+    await expect(page.locator('#contentLayoutSelect')).toHaveValue('listEditor');
+    await expect(page.locator('#ribbonListLayoutSelect')).toHaveValue('grid');
+
+    await page.selectOption('#workspacePositionSelect', 'right');
+    const rightDock = await page.evaluate(() => {
+      const sidebar = document.querySelector('.workspace-sidebar').getBoundingClientRect();
+      const editor = document.querySelector('.editor').getBoundingClientRect();
+      return { sidebarLeft: sidebar.left, editorLeft: editor.left };
+    });
+    expect(rightDock.sidebarLeft).toBeGreaterThan(rightDock.editorLeft);
+
+    await page.selectOption('#workspaceModeSelect', 'slide');
+    await expect(page.locator('.workspace-sidebar')).toBeHidden();
+    await page.click('#workspaceToggleButton');
+    await expect(page.locator('.workspace-sidebar')).toBeVisible();
+    await expect(page.locator('#workspaceToggleButton')).toHaveAttribute('aria-expanded', 'true');
+
+    await page.selectOption('#contentLayoutSelect', 'editorList');
+    const editorLeft = await page.evaluate(() => {
+      const editor = document.querySelector('.editor').getBoundingClientRect();
+      const library = document.querySelector('.library').getBoundingClientRect();
+      return editor.left < library.left;
+    });
+    expect(editorLeft).toBe(true);
+
+    await page.selectOption('#ribbonListLayoutSelect', 'list');
+    await expect(page.locator('#memoList')).toHaveClass(/list-view/);
   });
 
   test('uses wider desktop space while keeping mobile single column', async ({ page }) => {

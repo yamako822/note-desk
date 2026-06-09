@@ -1,4 +1,4 @@
-const CACHE = "note-desk-v10";
+const CACHE = "note-desk-v11";
 
 const ASSETS = [
   "./",
