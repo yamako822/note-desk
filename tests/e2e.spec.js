@@ -26,6 +26,7 @@ test.describe('NoteDesk E2E', () => {
       localStorage.setItem('note-desk-autosave', 'true');
       localStorage.removeItem('note-desk-safe-mode');
       localStorage.removeItem('note-desk-ai-mode');
+      localStorage.removeItem('note-desk-mobile-view');
     });
   });
 
@@ -647,5 +648,22 @@ test.describe('NoteDesk E2E', () => {
     expect(mobile.appWidth).toBeLessThanOrEqual(mobile.viewportWidth);
     expect(mobile.scrollWidth).toBeLessThanOrEqual(mobile.viewportWidth);
     expect(mobile.gridColumns.split(' ').length).toBe(1);
+    await expect(page.locator('.mobile-section-tabs')).toBeVisible();
+    await expect(page.locator('.library')).toBeVisible();
+    await expect(page.locator('.editor')).toBeHidden();
+    await expect(page.locator('.workspace-sidebar')).toBeHidden();
+
+    await page.click('[data-mobile-view="editor"]');
+    await expect(page.locator('.editor')).toBeVisible();
+    await expect(page.locator('.library')).toBeHidden();
+
+    await page.click('[data-mobile-view="sidebar"]');
+    await expect(page.locator('.workspace-sidebar')).toBeVisible();
+    await expect(page.locator('.editor')).toBeHidden();
+
+    await page.click('[data-mobile-view="library"]');
+    await page.click('#newMemoButton');
+    await expect(page.locator('.editor')).toBeVisible();
+    await expect(page.locator('.mobile-section-tabs [data-mobile-view="editor"]')).toHaveAttribute('aria-pressed', 'true');
   });
 });

@@ -7,6 +7,7 @@ const LOCAL_MODE_KEY = "note-desk-local-mode";
 const LOCAL_ENTRY_KEY = "note-desk-local-entry";
 const LOCAL_MEMOS_KEY = "note-desk-local-notes";
 const LOCAL_DISPLAY_NAME_KEY = "note-desk-local-display-name";
+const MOBILE_VIEW_SETTING_KEY = "note-desk-mobile-view";
 const DRAFT_KEY = "note-desk-draft";
 const CUSTOM_COLORS_KEY = "note-desk-custom-colors";
 const LAYOUT_SETTING_KEY = "note-desk-layout-setting";
@@ -19,6 +20,7 @@ const SAFE_MODE_SETTING_KEY = "note-desk-safe-mode";
 const loginScreen = document.querySelector("#loginScreen");
 const appScreen = document.querySelector("#appScreen");
 const appLoading = document.querySelector("#appLoading");
+const mobileSectionTabs = document.querySelectorAll("[data-mobile-view]");
 const googleLoginButton = document.querySelector("#googleLoginButton");
 const emailAuthForm = document.querySelector("#emailAuthForm");
 const emailInput = document.querySelector("#emailInput");
@@ -138,6 +140,7 @@ const NOTEBOOK_MAX_LENGTH = 32;
 const DEFAULT_NOTEBOOK = "未分類";
 const DEFAULT_NOTEBOOKS = ["未分類", "仕事", "学習", "個人", "議事録", "アイデア", "タスク"];
 const NOTE_TYPES = new Set(["text", "checklist"]);
+const MOBILE_VIEW_MODES = new Set(["library", "editor", "sidebar"]);
 const AUTO_TAG_LIMIT = 5;
 const ATTACHMENT_LIMIT = 3;
 const ATTACHMENT_MAX_BYTES = 220 * 1024;
@@ -303,6 +306,7 @@ let activeTag = "all";
 let activeNotebook = "all";
 let dateViewMode = DEFAULT_DATE_VIEW;
 let emailAuthMode = "signin";
+let mobileViewMode = readMobileViewMode();
 let showFavoritesOnly = false;
 let openMemoId = null;
 let currentPage = 1;
@@ -352,6 +356,56 @@ function saveSafeModeSetting(value) {
   try {
     localStorage.setItem(SAFE_MODE_SETTING_KEY, value ? "true" : "false");
   } catch {}
+}
+
+function readMobileViewMode() {
+  const saved = localStorage.getItem(MOBILE_VIEW_SETTING_KEY);
+  return MOBILE_VIEW_MODES.has(saved) ? saved : "library";
+}
+
+function saveMobileViewMode(mode) {
+  try {
+    localStorage.setItem(MOBILE_VIEW_SETTING_KEY, mode);
+  } catch {}
+}
+
+function isMobileViewport() {
+  return window.matchMedia("(max-width: 960px)").matches;
+}
+
+function applyMobileView(mode = mobileViewMode, { persist = false, scrollTop = false } = {}) {
+  if (!isMemoPage || !appScreen) return;
+
+  mobileViewMode = MOBILE_VIEW_MODES.has(mode) ? mode : "library";
+  appScreen.dataset.mobileView = mobileViewMode;
+
+  mobileSectionTabs.forEach((button) => {
+    const isActive = button.dataset.mobileView === mobileViewMode;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+
+  if (persist) saveMobileViewMode(mobileViewMode);
+  if (scrollTop && isMobileViewport()) {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
+function showMobileView(mode, options = {}) {
+  applyMobileView(mode, { persist: true, scrollTop: true, ...options });
+}
+
+function moveToEditor() {
+  showMobileView("editor");
+  if (isMobileViewport()) {
+    requestAnimationFrame(() => titleInput?.focus());
+  } else {
+    document.querySelector(".editor")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+}
+
+function moveToLibrary() {
+  showMobileView("library");
 }
 
 function readBrowserAiMode() {
@@ -2423,7 +2477,10 @@ function createSidebarButton(label, count, active, onClick) {
   button.innerHTML = `<span></span><strong></strong>`;
   button.querySelector("span").textContent = label;
   button.querySelector("strong").textContent = String(count);
-  button.addEventListener("click", onClick);
+  button.addEventListener("click", () => {
+    onClick();
+    if (isMobileViewport()) moveToLibrary();
+  });
   return button;
 }
 
@@ -2660,13 +2717,14 @@ function resetForm() {
   clearFormError();
   hideAutoTagStatus();
   hideTagSuggestions();
-  if (!appScreen.hidden && appLoading.hidden) titleInput.focus();
+  if (!isMobileViewport() && !appScreen.hidden && appLoading.hidden) titleInput.focus();
 }
 
 function startEditing(id) {
   const memo = memos.find((item) => item.id === id);
   if (!memo) return;
 
+  moveToEditor();
   closeMemoDialog();
   editingId = id;
   renderNotebookControls();
@@ -3209,7 +3267,14 @@ function bindLoginPage() {
 }
 
 function bindMemoPage() {
+  applyMobileView(mobileViewMode);
   applySafeModeSetting();
+  mobileSectionTabs.forEach((button) => {
+    button.addEventListener("click", () => {
+      showMobileView(button.dataset.mobileView);
+    });
+  });
+  window.addEventListener("resize", () => applyMobileView(mobileViewMode));
   usernameForm.addEventListener("submit", updateUsername);
   feedbackButton.addEventListener("click", openFeedbackForm);
   logoutButton.addEventListener("click", logout);
@@ -3261,6 +3326,7 @@ function bindMemoPage() {
       await saveMemo(memo);
       clearDraft();
       resetForm();
+      if (isMobileViewport()) moveToLibrary();
     } catch {
       showFormError(
         dataMode === "local"
@@ -3343,14 +3409,14 @@ function bindMemoPage() {
     clearDraft();
     clearRememberedOpenMemo();
     resetForm();
-    document.querySelector(".editor")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    moveToEditor();
   });
   sidebarNewNoteButton?.addEventListener("click", () => {
     closeMemoDialog();
     clearDraft();
     clearRememberedOpenMemo();
     resetForm();
-    document.querySelector(".editor")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    moveToEditor();
   });
   sidebarDateViewButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -3358,6 +3424,7 @@ function bindMemoPage() {
       dateViewMode = DATE_VIEW_MODES.has(view) ? view : DEFAULT_DATE_VIEW;
       resetPagination();
       render();
+      if (isMobileViewport()) moveToLibrary();
     });
   });
 

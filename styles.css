@@ -247,6 +247,10 @@ label {
   text-align: center;
 }
 
+.mobile-section-tabs {
+  display: none;
+}
+
 .header-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1939,13 +1943,76 @@ mark {
 @media (max-width: 960px) {
   .app {
     grid-template-columns: 1fr;
-    grid-template-areas:
-      "editor"
-      "library"
-      "sidebar";
-    margin: 16px auto;
-    width: min(100% - 24px, 720px);
-    gap: 16px;
+    grid-template-areas: "library";
+    margin: 0 auto;
+    width: min(100%, 720px);
+    gap: 0;
+    padding: 12px 12px calc(90px + env(safe-area-inset-bottom));
+  }
+
+  .app[data-mobile-view="editor"] {
+    grid-template-areas: "editor";
+  }
+
+  .app[data-mobile-view="sidebar"] {
+    grid-template-areas: "sidebar";
+  }
+
+  .mobile-section-tabs {
+    position: fixed;
+    right: auto;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 70;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    width: min(520px, calc(100% - 24px));
+    margin: 0 auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px;
+    background: var(--panel);
+    box-shadow: var(--shadow);
+  }
+
+  .mobile-section-tabs button {
+    min-height: 46px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+
+  .mobile-section-tabs button.active,
+  .mobile-section-tabs button[aria-pressed="true"] {
+    border-color: var(--accent-line);
+    background: var(--soft);
+    color: var(--accent-dark);
+  }
+
+  .app > .workspace-sidebar,
+  .app > .editor,
+  .app > .library {
+    display: none;
+    width: 100%;
+    box-shadow: none;
+  }
+
+  .app[data-mobile-view="library"] > .library {
+    display: block;
+  }
+
+  .app[data-mobile-view="editor"] > .editor {
+    display: block;
+  }
+
+  .app[data-mobile-view="sidebar"] > .workspace-sidebar {
+    display: grid;
   }
 
   .workspace-sidebar {
@@ -1960,6 +2027,11 @@ mark {
 
   .library {
     min-height: auto;
+    padding: 16px;
+  }
+
+  .editor {
+    padding: 16px;
   }
 
   .app-header {
@@ -1983,8 +2055,14 @@ mark {
   }
 
   .toolbar-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: stretch;
-    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toolbar-actions #searchInput {
+    grid-column: 1 / -1;
   }
 
   .toolbar input {

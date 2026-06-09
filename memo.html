@@ -10,14 +10,20 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="NoteDesk">
     <title>NoteDesk | Notes</title>
-    <link rel="manifest" href="manifest.webmanifest?v=22">
+    <link rel="manifest" href="manifest.webmanifest?v=23">
     <link rel="icon" href="icons/icon.svg?v=2" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/icon-192.png?v=2">
-    <link rel="stylesheet" href="styles.css?v=22">
+    <link rel="stylesheet" href="styles.css?v=23">
   </head>
   <body>
     <main id="appScreen" class="app" hidden>
       <p class="app-loading" id="appLoading" hidden>ノートを読み込み中…</p>
+
+      <nav class="mobile-section-tabs" aria-label="スマホ表示切替">
+        <button type="button" data-mobile-view="library" aria-pressed="true">一覧</button>
+        <button type="button" data-mobile-view="editor" aria-pressed="false">作成</button>
+        <button type="button" data-mobile-view="sidebar" aria-pressed="false">整理</button>
+      </nav>
 
       <aside class="workspace-sidebar" aria-label="ワークスペース">
         <div class="sidebar-brand">
@@ -483,7 +489,7 @@
       </article>
     </div>
 
-    <script type="module" src="app.js?v=22"></script>
-    <script src="pwa.js?v=22"></script>
+    <script type="module" src="app.js?v=23"></script>
+    <script src="pwa.js?v=23"></script>
   </body>
 </html>
