@@ -588,6 +588,26 @@ textarea {
   line-height: 1.55;
 }
 
+.safe-mode-badge {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 6px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--field);
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.safe-mode-badge[data-state="off"] {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
 .browser-ai-controls {
   display: grid;
   grid-template-columns: minmax(110px, 1fr) auto;

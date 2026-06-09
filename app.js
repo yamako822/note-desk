@@ -1,7 +1,5 @@
-import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
 import { feedbackConfig, isFeedbackConfigured } from "./feedback-config.js";
 
-const FIREBASE_VERSION = "11.6.0";
 const LEGACY_STORAGE_KEY = "note-desk-notes";
 const DISPLAY_SETTINGS_KEY = "note-desk-display-settings";
 const SORT_SETTING_KEY = "note-desk-sort-setting";
@@ -16,6 +14,7 @@ const LAST_OPEN_MEMO_KEY = "note-desk-last-open-note";
 const OUTLOOK_REMINDER_SETTING_KEY = "note-desk-outlook-reminder-minutes";
 const AUTOSAVE_SETTING_KEY = "note-desk-autosave";
 const AI_MODE_SETTING_KEY = "note-desk-ai-mode";
+const SAFE_MODE_SETTING_KEY = "note-desk-safe-mode";
 
 const loginScreen = document.querySelector("#loginScreen");
 const appScreen = document.querySelector("#appScreen");
@@ -56,6 +55,7 @@ const browserAiStatus = document.querySelector("#browserAiStatus");
 const browserAiCheckButton = document.querySelector("#browserAiCheckButton");
 const browserAiModeSelect = document.querySelector("#browserAiModeSelect");
 const browserAiActionButtons = document.querySelectorAll("[data-ai-action]");
+const safeModeBadge = document.querySelector("#safeModeBadge");
 const sidebarNewNoteButton = document.querySelector("#sidebarNewNoteButton");
 const sidebarDateViewButtons = document.querySelectorAll("[data-sidebar-date-view]");
 const sidebarNotebookList = document.querySelector("#sidebarNotebookList");
@@ -108,6 +108,7 @@ const settingsDialog = document.querySelector("#settingsDialog");
 const settingsDialogCloseButton = document.querySelector("#settingsDialogCloseButton");
 const outlookReminderSelect = document.querySelector("#outlookReminderSelect");
 const autoSaveToggle = document.querySelector("#autoSaveToggle");
+const safeModeToggle = document.querySelector("#safeModeToggle");
 const settingsClearLocalButton = document.querySelector("#settingsClearLocalButton");
 const brightnessResetButton = document.querySelector("#brightnessResetButton");
 const accentColorInput = document.querySelector("#accentColorInput");
@@ -296,7 +297,7 @@ let writeBatch = null;
 let currentUser = null;
 let unsubscribeMemos = null;
 let memos = [];
-let dataMode = "cloud";
+let dataMode = "local";
 let editingId = null;
 let activeTag = "all";
 let activeNotebook = "all";
@@ -311,6 +312,7 @@ let currentAttachments = [];
 let dialogSearchQuery = "";
 let browserAiBaseSession = null;
 let browserAiBusy = false;
+let safeMode = readSafeModeSetting();
 let browserAiMode = readBrowserAiMode();
 let webLlmModule = null;
 let webLlmEngine = null;
@@ -342,7 +344,18 @@ function readCustomColors() {
   }
 }
 
+function readSafeModeSetting() {
+  return localStorage.getItem(SAFE_MODE_SETTING_KEY) !== "false";
+}
+
+function saveSafeModeSetting(value) {
+  try {
+    localStorage.setItem(SAFE_MODE_SETTING_KEY, value ? "true" : "false");
+  } catch {}
+}
+
 function readBrowserAiMode() {
+  if (readSafeModeSetting()) return "light";
   const saved = localStorage.getItem(AI_MODE_SETTING_KEY);
   return AI_MODES.has(saved) ? saved : DEFAULT_AI_MODE;
 }
@@ -354,8 +367,25 @@ function saveBrowserAiMode(mode) {
 }
 
 function applyBrowserAiMode(mode) {
-  browserAiMode = AI_MODES.has(mode) ? mode : DEFAULT_AI_MODE;
+  browserAiMode = safeMode ? "light" : (AI_MODES.has(mode) ? mode : DEFAULT_AI_MODE);
   if (browserAiModeSelect) browserAiModeSelect.value = browserAiMode;
+  if (browserAiModeSelect) browserAiModeSelect.disabled = safeMode;
+}
+
+function applySafeModeSetting() {
+  safeMode = readSafeModeSetting();
+  if (safeModeToggle) safeModeToggle.checked = safeMode;
+  if (safeModeBadge) {
+    safeModeBadge.textContent = safeMode ? "安全モード ON" : "安全モード OFF";
+    safeModeBadge.dataset.state = safeMode ? "safe" : "off";
+  }
+  if (safeMode) {
+    applyBrowserAiMode("light");
+    saveBrowserAiMode("light");
+    setBrowserAiStatus("安全モード中です。軽量AIのみを使い、高性能AIのモデル読込を行いません。", "ready");
+  } else {
+    applyBrowserAiMode(browserAiMode);
+  }
 }
 
 function saveCustomColors(colors) {
@@ -1126,6 +1156,9 @@ function formatWebLlmProgress(progress) {
 
 async function ensureWebLlmEngine() {
   if (webLlmEngine) return webLlmEngine;
+  if (safeMode) {
+    throw new Error("安全モード中は高性能AIを読み込みません。");
+  }
   if (!canUseWebLlm()) {
     throw new Error("このブラウザではWebGPUが利用できないため、高性能AIを使えません。");
   }
@@ -1160,6 +1193,10 @@ async function promptWebLlm(prompt) {
 }
 
 async function generateBrowserAiResult(action, prompt) {
+  if (safeMode) {
+    return { result: createLocalBrowserAiResult(action), source: "安全モード" };
+  }
+
   if (browserAiMode === "light") {
     return { result: createLocalBrowserAiResult(action), source: "軽量AI" };
   }
@@ -1278,6 +1315,10 @@ async function checkBrowserAiAvailability() {
   setBrowserAiStatus("ブラウザAIを確認しています。", "working");
 
   try {
+    if (safeMode) {
+      setBrowserAiStatus("安全モード中です。軽量AIのみ利用できます。ノート本文は外部AIへ送信されません。", "ready");
+      return;
+    }
     if (browserAiMode === "light") {
       setBrowserAiStatus("通常版Edgeでも使える軽量ブラウザAIで利用できます。外部送信なしで端末内処理します。", "ready");
       return;
@@ -1649,40 +1690,6 @@ let draftInputHandler = null;
 let confirmAction = null;
 let pendingDeleteMemoId = null;
 
-async function loadFirebaseModules() {
-  if (initializeApp) return;
-
-  const [appModule, authModule, firestoreModule] = await Promise.all([
-    import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app.js`),
-    import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-auth.js`),
-    import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-firestore.js`),
-  ]);
-
-  ({ initializeApp } = appModule);
-  ({
-    createUserWithEmailAndPassword,
-    getAuth,
-    GoogleAuthProvider,
-    onAuthStateChanged,
-    signInWithEmailAndPassword,
-    signInWithPopup,
-    signOut,
-    updateProfile,
-  } = authModule);
-  ({
-    collection,
-    deleteDoc,
-    doc,
-    getDocs,
-    getFirestore,
-    onSnapshot,
-    orderBy,
-    query,
-    setDoc,
-    writeBatch,
-  } = firestoreModule);
-}
-
 function pageUrl(fileName) {
   const url = new URL(window.location.href);
   url.pathname = url.pathname.replace(/[^/]*$/, fileName);
@@ -2016,7 +2023,7 @@ function enterLocalApp() {
   };
   if (appScreen) appScreen.hidden = false;
   updateUserDisplay(currentUser);
-  if (logoutButton) logoutButton.textContent = useLocalOnlyEntry() ? "ログイン画面に戻る" : "モード選択へ";
+  if (logoutButton) logoutButton.textContent = "入口へ戻る";
   editingId = null;
   activeTag = "all";
   activeNotebook = "all";
@@ -2034,11 +2041,9 @@ function enterLocalApp() {
 
 async function logout() {
   stopMemoSubscription();
-  if (dataMode === "cloud" && auth) await signOut(auth);
-  const shouldReturnToLocalStart = dataMode === "local" && useLocalOnlyEntry();
-  if (dataMode === "local") disableLocalMode();
+  const shouldReturnToLocalStart = true;
   memos = [];
-  dataMode = "cloud";
+  dataMode = "local";
   editingId = null;
   activeTag = "all";
   showFavoritesOnly = false;
@@ -2644,6 +2649,7 @@ function resetForm() {
   form.reset();
   editingId = null;
   currentAttachments = [];
+  applyBrowserAiMode(browserAiMode);
   if (noteTypeSelect) noteTypeSelect.value = "text";
   if (customNotebookInput) customNotebookInput.value = "";
   if (noteTemplateSelect) noteTemplateSelect.value = "";
@@ -3165,67 +3171,23 @@ function exportMemo(id, format = "md") {
   downloadTextFile(`${baseName}.md`, buildMarkdownExport(memo), "text/markdown;charset=utf-8");
 }
 
-async function initFirebase() {
-  if (isLocalModeEnabled()) {
-    if (isLoginPage) {
-      goToMemos();
-    } else {
-      enterLocalApp();
-    }
+async function initLocalApp() {
+  enableLocalMode();
+  localStorage.setItem(LOCAL_ENTRY_KEY, "true");
+
+  if (localStorage.getItem(SAFE_MODE_SETTING_KEY) === null) {
+    saveSafeModeSetting(true);
+  }
+  if (readSafeModeSetting()) {
+    saveBrowserAiMode("light");
+  }
+
+  if (isLoginPage) {
+    goToMemos();
     return;
   }
 
-  if (!isFirebaseConfigured()) {
-    if (isLoginPage) {
-      showLoginError("firebase-config.js が未設定です。FIREBASE_SETUP.md を参照してください。");
-      googleLoginButton.disabled = true;
-      emailSubmitButton.disabled = true;
-      showLogin();
-    } else {
-      showFormError("firebase-config.js が未設定です。FIREBASE_SETUP.md を参照してください。");
-      if (appScreen) appScreen.hidden = false;
-    }
-    return;
-  }
-
-  setAuthLoading(true);
-
-  try {
-    await loadFirebaseModules();
-  } catch (error) {
-    console.error(error);
-    if (isLoginPage) {
-      showLoginError("Firebase の読み込みに失敗しました。ネットワーク接続を確認するか、ローカルモードを使ってください。");
-      setAuthLoading(false);
-    } else {
-      showFormError("Firebase の読み込みに失敗しました。ネットワーク接続を確認してください。");
-      if (appScreen) appScreen.hidden = false;
-    }
-    return;
-  }
-
-  const app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-
-  onAuthStateChanged(auth, (user) => {
-    setAuthLoading(false);
-
-    if (user) {
-      if (isLoginPage) {
-        goToMemos();
-      } else {
-        enterApp(user);
-      }
-      return;
-    }
-
-    if (isMemoPage) {
-      goToLogin();
-    } else {
-      showLogin();
-    }
-  });
+  if (isMemoPage) enterLocalApp();
 }
 
 function bindLoginPage() {
@@ -3247,7 +3209,7 @@ function bindLoginPage() {
 }
 
 function bindMemoPage() {
-  applyBrowserAiMode(browserAiMode);
+  applySafeModeSetting();
   usernameForm.addEventListener("submit", updateUsername);
   feedbackButton.addEventListener("click", openFeedbackForm);
   logoutButton.addEventListener("click", logout);
@@ -3416,9 +3378,21 @@ function bindMemoPage() {
     tagsInput?.focus();
   });
   browserAiCheckButton?.addEventListener("click", checkBrowserAiAvailability);
+  safeModeToggle?.addEventListener("change", () => {
+    saveSafeModeSetting(Boolean(safeModeToggle.checked));
+    safeMode = readSafeModeSetting();
+    applySafeModeSetting();
+    if (!safeMode) {
+      setBrowserAiStatus("安全モードをOFFにしました。高性能AIを使う場合はAIモードを選択してください。", "ready");
+    }
+  });
   browserAiModeSelect?.addEventListener("change", () => {
     applyBrowserAiMode(browserAiModeSelect.value);
     saveBrowserAiMode(browserAiMode);
+    if (safeMode) {
+      setBrowserAiStatus("安全モード中は軽量AIに固定されます。", "ready");
+      return;
+    }
     if (browserAiMode === "high") {
       setBrowserAiStatus("高性能AIを使います。初回実行時はモデル準備に時間がかかります。", "ready");
     } else if (browserAiMode === "auto") {
@@ -3683,9 +3657,8 @@ function bindMemoPage() {
   applyOutlookReminderSetting(outlookReminderMinutes);
 }
 
-if (isLoginPage) bindLoginPage();
 if (isMemoPage) bindMemoPage();
-initFirebase();
+initLocalApp();
 
 // Auto-save and draft helpers
 function createDraftSnapshot() {

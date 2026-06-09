@@ -24,7 +24,26 @@ test.describe('NoteDesk E2E', () => {
     await page.addInitScript(() => {
       localStorage.setItem('note-desk-local-mode', 'true');
       localStorage.setItem('note-desk-autosave', 'true');
+      localStorage.removeItem('note-desk-safe-mode');
+      localStorage.removeItem('note-desk-ai-mode');
     });
+  });
+
+  test('root entry is local only and starts safe mode', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#local-safe-title')).toHaveText('ローカル専用ノート');
+    await expect(page.locator('#googleLoginButton')).toHaveCount(0);
+    await expect(page.locator('#emailAuthForm')).toHaveCount(0);
+    await page.click('#startLocalSafeButton');
+    await page.waitForURL(/memo\.html$/);
+    await page.waitForSelector('#memoTitle');
+
+    const settings = await page.evaluate(() => ({
+      localMode: localStorage.getItem('note-desk-local-mode'),
+      safeMode: localStorage.getItem('note-desk-safe-mode'),
+      aiMode: localStorage.getItem('note-desk-ai-mode')
+    }));
+    expect(settings).toEqual({ localMode: 'true', safeMode: 'true', aiMode: 'light' });
   });
 
   test('autosave creates draft in localStorage', async ({ page }) => {
@@ -307,10 +326,11 @@ test.describe('NoteDesk E2E', () => {
 
     await expect(page.locator('#settingsDialog #helpButton')).toHaveCount(0);
     await expect(page.locator('#settingsDialog #feedbackButton')).toBeVisible();
-    await expect(page.locator('#settingsDialog #logoutButton')).toHaveText('ログイン画面に戻る');
+    await expect(page.locator('#settingsDialog #logoutButton')).toHaveText('入口へ戻る');
     await expect(page.locator('#settingsDialog #usernameForm')).toBeVisible();
     await expect(page.locator('#outlookReminderSelect')).toHaveValue('15');
     await expect(page.locator('#settingsDialog')).toContainText('ブラウザAI');
+    await expect(page.locator('#settingsDialog')).toContainText('安全モード');
     const headerButtonSizes = await page.evaluate(() => {
       const settings = document.querySelector('#settingsButton').getBoundingClientRect();
       const help = document.querySelector('#helpButton').getBoundingClientRect();
@@ -388,6 +408,7 @@ test.describe('NoteDesk E2E', () => {
 
   test('browser AI buttons apply generated title tags and summary', async ({ page }) => {
     await page.addInitScript(() => {
+      localStorage.setItem('note-desk-safe-mode', 'false');
       localStorage.setItem('note-desk-ai-mode', 'auto');
       const prompt = async (input) => {
         if (input.includes('短いタイトル')) return '改善計画';
@@ -428,6 +449,7 @@ test.describe('NoteDesk E2E', () => {
 
   test('browser AI falls back to lightweight local mode without LanguageModel', async ({ page }) => {
     await page.addInitScript(() => {
+      localStorage.setItem('note-desk-safe-mode', 'false');
       localStorage.setItem('note-desk-ai-mode', 'light');
       Object.defineProperty(window, 'LanguageModel', {
         configurable: true,
@@ -460,6 +482,7 @@ test.describe('NoteDesk E2E', () => {
 
   test('high performance browser AI uses WebLLM provider when available', async ({ page }) => {
     await page.addInitScript(() => {
+      localStorage.setItem('note-desk-safe-mode', 'false');
       localStorage.setItem('note-desk-ai-mode', 'high');
       Object.defineProperty(navigator, 'gpu', {
         configurable: true,
@@ -495,6 +518,23 @@ test.describe('NoteDesk E2E', () => {
     await page.click('[data-ai-action="title"]');
     await expect(page.locator('#memoTitle')).toHaveValue('高性能改善ノート');
     await expect(page.locator('#browserAiStatus')).toContainText('高性能AIでタイトル');
+  });
+
+  test('safe mode locks AI to lightweight local mode', async ({ page }) => {
+    await page.goto('/memo.html');
+    await page.waitForSelector('#memoBody');
+    await expect(page.locator('#safeModeBadge')).toContainText('安全モード ON');
+    await expect(page.locator('#browserAiModeSelect')).toBeDisabled();
+    await expect(page.locator('#browserAiModeSelect')).toHaveValue('light');
+
+    await page.fill('#memoBody', '機密メモを整理して、担当者へ連絡する。');
+    await page.click('[data-ai-action="title"]');
+    await expect(page.locator('#memoTitle')).not.toHaveValue('');
+    await expect(page.locator('#browserAiStatus')).toContainText('安全モードでタイトル');
+
+    await page.click('#settingsButton');
+    await page.waitForSelector('#settingsDialog:not([hidden])');
+    await expect(page.locator('#safeModeToggle')).toBeChecked();
   });
 
   test('tag filter opens dialog and filters by selected tag', async ({ page }) => {

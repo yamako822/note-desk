@@ -1,4 +1,4 @@
-const CACHE = "note-desk-v7";
+const CACHE = "note-desk-v8";
 
 const ASSETS = [
   "./",
@@ -8,7 +8,6 @@ const ASSETS = [
   "./styles.css",
   "./app.js",
   "./pwa.js",
-  "./firebase-config.js",
   "./feedback-config.js",
   "./manifest.webmanifest",
   "./icons/icon.svg?v=2",
