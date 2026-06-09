@@ -310,6 +310,7 @@ test.describe('NoteDesk E2E', () => {
     await expect(page.locator('#settingsDialog #logoutButton')).toHaveText('ログイン画面に戻る');
     await expect(page.locator('#settingsDialog #usernameForm')).toBeVisible();
     await expect(page.locator('#outlookReminderSelect')).toHaveValue('15');
+    await expect(page.locator('#settingsDialog')).toContainText('ブラウザAI');
     const headerButtonSizes = await page.evaluate(() => {
       const settings = document.querySelector('#settingsButton').getBoundingClientRect();
       const help = document.querySelector('#helpButton').getBoundingClientRect();
@@ -340,11 +341,12 @@ test.describe('NoteDesk E2E', () => {
 
     await page.waitForSelector('#helpDialog:not([hidden])');
     await expect(page.locator('#helpDialogTitle')).toHaveText('使い方ガイド');
-    await expect(page.locator('.help-card')).toHaveCount(4);
+    await expect(page.locator('.help-card')).toHaveCount(5);
     await expect(page.locator('.help-dialog-body')).toContainText('ノートを作る');
     await expect(page.locator('.help-dialog-body')).toContainText('探す・絞り込む');
     await expect(page.locator('.help-dialog-body')).toContainText('整理する');
     await expect(page.locator('.help-dialog-body')).toContainText('表示と下書き');
+    await expect(page.locator('.help-dialog-body')).toContainText('ブラウザAI');
     await expect(page.locator('#outlookHelpTitle')).toHaveText('Outlookでリマインダー通知を受ける');
     const outlookHelp = page.locator('[aria-labelledby="outlookHelpTitle"]');
     await expect(outlookHelp.locator('figure')).toHaveCount(3);
@@ -361,7 +363,7 @@ test.describe('NoteDesk E2E', () => {
       }))
     );
 
-    expect(images).toHaveLength(7);
+    expect(images).toHaveLength(8);
     for (const image of images) {
       expect(image.complete).toBeTruthy();
       expect(image.width).toBeGreaterThan(0);
@@ -381,6 +383,46 @@ test.describe('NoteDesk E2E', () => {
     expect(combinedSvgText).toContain('タイトル');
     expect(combinedSvgText).toContain('ノート一覧');
     expect(combinedSvgText).toContain('朝8:00予定');
+    expect(combinedSvgText).toContain('ブラウザAI');
+  });
+
+  test('browser AI buttons apply generated title tags and summary', async ({ page }) => {
+    await page.addInitScript(() => {
+      const prompt = async (input) => {
+        if (input.includes('短いタイトル')) return '改善計画';
+        if (input.includes('最大5個')) return '改善, 仕事, 重要';
+        if (input.includes('3行以内')) return '- 改善内容を短く整理します';
+        if (input.includes('チェックリスト')) return '- [ ] 改善案を確認する';
+        return '読みやすく整えた本文です。';
+      };
+      const session = {
+        prompt,
+        clone: async () => ({ prompt, destroy() {} }),
+        destroy() {}
+      };
+      Object.defineProperty(window, 'LanguageModel', {
+        configurable: true,
+        value: {
+          availability: async () => 'available',
+          create: async () => session
+        }
+      });
+    });
+
+    await page.goto('/memo.html');
+    await page.waitForSelector('#memoBody');
+    await page.fill('#memoBody', '今年の改善業務を整理して、優先順位を決める。');
+
+    await page.click('[data-ai-action="title"]');
+    await expect(page.locator('#memoTitle')).toHaveValue('改善計画');
+    await expect(page.locator('#browserAiStatus')).toContainText('タイトルを作成');
+
+    await page.click('[data-ai-action="tags"]');
+    await expect(page.locator('#memoTags')).toHaveValue(/改善/);
+    await expect(page.locator('#memoTags')).toHaveValue(/仕事/);
+
+    await page.click('[data-ai-action="summary"]');
+    await expect(page.locator('#memoBody')).toHaveValue(/## AI要約/);
   });
 
   test('tag filter opens dialog and filters by selected tag', async ({ page }) => {

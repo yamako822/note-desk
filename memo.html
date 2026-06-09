@@ -10,10 +10,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="NoteDesk">
     <title>NoteDesk | Notes</title>
-    <link rel="manifest" href="manifest.webmanifest?v=17">
+    <link rel="manifest" href="manifest.webmanifest?v=18">
     <link rel="icon" href="icons/icon.svg?v=2" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/icon-192.png?v=2">
-    <link rel="stylesheet" href="styles.css?v=17">
+    <link rel="stylesheet" href="styles.css?v=18">
   </head>
   <body>
     <main id="appScreen" class="app" hidden>
@@ -71,6 +71,22 @@
             <button type="button" class="secondary" data-markdown-action="link" title="リンクを挿入">🔗</button>
           </div>
           <textarea id="memoBody" rows="10" maxlength="10000" placeholder="Markdownで本文を書けます。見出し、箇条書き、チェックリスト、リンクに対応しています。" aria-required="true"></textarea>
+          <section class="browser-ai-panel" aria-labelledby="browserAiTitle">
+            <div class="browser-ai-header">
+              <div>
+                <h2 id="browserAiTitle">ブラウザAI</h2>
+                <p id="browserAiStatus" aria-live="polite">対応ブラウザではノート内容を端末内で処理できます。</p>
+              </div>
+              <button type="button" class="secondary" id="browserAiCheckButton">確認</button>
+            </div>
+            <div class="browser-ai-actions" aria-label="ブラウザAI操作">
+              <button type="button" class="secondary" data-ai-action="title">タイトル</button>
+              <button type="button" class="secondary" data-ai-action="summary">要約</button>
+              <button type="button" class="secondary" data-ai-action="tags">タグ</button>
+              <button type="button" class="secondary" data-ai-action="checklist">チェックリスト</button>
+              <button type="button" class="secondary" data-ai-action="polish">整える</button>
+            </div>
+          </section>
           <div class="tag-input-row">
             <input id="memoTags" type="text" maxlength="260" placeholder="タグ（例: 学習, アイデア）" autocomplete="off">
             <button type="button" class="secondary" id="autoTagButton">自動タグ</button>
@@ -251,6 +267,13 @@
                 <p>歯車からダークモード、明るさ、カスタムカラー、表示形式、自動下書き保存を変更できます。入力途中のノートを残したい時は自動下書き保存が便利です。</p>
               </div>
             </section>
+            <section class="help-card" aria-labelledby="helpAiTitle">
+              <img src="images/help-browser-ai.svg?v=1" alt="ブラウザAIでタイトル、要約、タグ、チェックリスト、文章整形を実行する画面">
+              <div>
+                <h3 id="helpAiTitle">ブラウザAI</h3>
+                <p>対応ブラウザでは端末内のAIでタイトル作成、要約、タグ提案、チェックリスト化、文章整形ができます。未対応の場合は案内が表示されます。</p>
+              </div>
+            </section>
           </div>
           <section class="outlook-help" aria-labelledby="outlookHelpTitle">
             <h3 id="outlookHelpTitle">Outlookでリマインダー通知を受ける</h3>
@@ -273,7 +296,7 @@
           </section>
           <section class="outlook-help" aria-labelledby="noteFeatureHelpTitle">
             <h3 id="noteFeatureHelpTitle">ノート機能</h3>
-            <p>Markdownの見出しから目次を自動生成し、チェックリスト、テンプレート、本文内検索、添付、ノート複製、アーカイブ、MD/TXT出力が使えます。</p>
+            <p>Markdownの見出しから目次を自動生成し、チェックリスト、テンプレート、本文内検索、添付、ノート複製、アーカイブ、MD/TXT出力が使えます。ブラウザAIは初回だけモデル準備に時間がかかる場合があります。</p>
           </section>
         </div>
       </article>
@@ -377,6 +400,11 @@
           </div>
 
           <div class="settings-section">
+            <h3>ブラウザAI</h3>
+            <p class="muted">Chrome/Edgeなどの対応ブラウザでは、ノート本文を外部サーバーへ送らず端末内のAIで処理します。初回はモデルの準備やダウンロードが必要な場合があります。</p>
+          </div>
+
+          <div class="settings-section">
             <h3>その他</h3>
             <div class="settings-actions">
               <button type="button" class="secondary feedback-button" id="feedbackButton">要望を送る</button>
@@ -407,7 +435,7 @@
       </article>
     </div>
 
-    <script type="module" src="app.js?v=17"></script>
-    <script src="pwa.js?v=17"></script>
+    <script type="module" src="app.js?v=18"></script>
+    <script src="pwa.js?v=18"></script>
   </body>
 </html>

@@ -451,6 +451,65 @@ textarea {
   resize: vertical;
 }
 
+.browser-ai-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--soft), var(--card-bg));
+}
+
+.browser-ai-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.browser-ai-header h2 {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.browser-ai-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.browser-ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.browser-ai-actions button,
+.browser-ai-header button {
+  white-space: nowrap;
+}
+
+.browser-ai-panel[data-state="working"] {
+  border-color: var(--accent);
+}
+
+.browser-ai-panel[data-state="ready"] #browserAiStatus {
+  color: var(--accent-dark);
+}
+
+.browser-ai-panel[data-state="error"] {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+}
+
+.browser-ai-panel[data-state="error"] #browserAiStatus {
+  color: var(--danger);
+}
+
 .tag-input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

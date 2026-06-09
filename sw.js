@@ -1,4 +1,4 @@
-const CACHE = "note-desk-v3";
+const CACHE = "note-desk-v4";
 
 const ASSETS = [
   "./",
@@ -18,6 +18,7 @@ const ASSETS = [
   "./images/help-find-filter.svg?v=5",
   "./images/help-organize.svg?v=5",
   "./images/help-settings.svg?v=5",
+  "./images/help-browser-ai.svg?v=1",
   "./images/outlook-help-step-1.svg?v=5",
   "./images/outlook-help-step-2.svg?v=5",
   "./images/outlook-help-step-3.svg?v=5",

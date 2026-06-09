@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" role="img" aria-labelledby="title desc">
+  <title id="title">ブラウザAI</title>
+  <desc id="desc">タイトル、要約、タグ、チェックリスト、文章整形をブラウザAIで実行する画面。</desc>
+  <rect width="480" height="270" rx="18" fill="#faf7ff"/>
+  <rect x="54" y="34" width="372" height="202" rx="14" fill="#ffffff" stroke="#dedbd2"/>
+  <text x="78" y="70" fill="#202124" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="20" font-weight="800">ブラウザAI</text>
+  <text x="78" y="95" fill="#67706f" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="13" font-weight="600">端末内でノートを補助</text>
+  <rect x="78" y="116" width="324" height="46" rx="10" fill="#f3e8ff" stroke="#c4b5fd"/>
+  <path d="M100 139c16-26 33-26 49 0 16 26 33 26 49 0" fill="none" stroke="#7c3aed" stroke-width="5" stroke-linecap="round"/>
+  <text x="228" y="145" fill="#5b21b6" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="14" font-weight="800">AIで作成しています</text>
+  <rect x="78" y="180" width="58" height="30" rx="8" fill="#ffffff" stroke="#c4b5fd"/>
+  <text x="92" y="200" fill="#5b21b6" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="13" font-weight="800">タイトル</text>
+  <rect x="146" y="180" width="48" height="30" rx="8" fill="#ffffff" stroke="#c4b5fd"/>
+  <text x="158" y="200" fill="#5b21b6" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="13" font-weight="800">要約</text>
+  <rect x="204" y="180" width="48" height="30" rx="8" fill="#ffffff" stroke="#c4b5fd"/>
+  <text x="216" y="200" fill="#5b21b6" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="13" font-weight="800">タグ</text>
+  <rect x="262" y="180" width="82" height="30" rx="8" fill="#ffffff" stroke="#c4b5fd"/>
+  <text x="276" y="200" fill="#5b21b6" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="13" font-weight="800">チェック</text>
+  <rect x="354" y="180" width="48" height="30" rx="8" fill="#7c3aed"/>
+  <text x="366" y="200" fill="#ffffff" font-family="Segoe UI, Yu Gothic UI, Meiryo, Arial, sans-serif" font-size="13" font-weight="800">整える</text>
+  <circle cx="386" cy="64" r="18" fill="#ede9fe" stroke="#c4b5fd"/>
+  <path d="M386 53v22M375 64h22" stroke="#7c3aed" stroke-width="4" stroke-linecap="round"/>
+</svg>

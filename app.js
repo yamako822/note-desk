@@ -50,6 +50,10 @@ const attachmentList = document.querySelector("#attachmentList");
 const reminderInput = document.querySelector("#memoReminder");
 const autoTagButton = document.querySelector("#autoTagButton");
 const autoTagStatus = document.querySelector("#autoTagStatus");
+const browserAiPanel = document.querySelector(".browser-ai-panel");
+const browserAiStatus = document.querySelector("#browserAiStatus");
+const browserAiCheckButton = document.querySelector("#browserAiCheckButton");
+const browserAiActionButtons = document.querySelectorAll("[data-ai-action]");
 const searchInput = document.querySelector("#searchInput");
 const sortSelect = document.querySelector("#sortSelect");
 const notebookFilterSelect = document.querySelector("#notebookFilterSelect");
@@ -134,6 +138,11 @@ const OUTLOOK_EVENT_START_HOUR = 8;
 const DEFAULT_OUTLOOK_REMINDER_MINUTES = 15;
 const OUTLOOK_REMINDER_OPTIONS = new Set([0, 5, 15, 30, 60, 1440]);
 const ICS_LINE_BYTE_LIMIT = 72;
+const BROWSER_AI_CONTEXT_LIMIT = 5200;
+const BROWSER_AI_SESSION_OPTIONS = {
+  expectedInputs: [{ type: "text", languages: ["ja", "en"] }],
+  expectedOutputs: [{ type: "text", languages: ["ja"] }],
+};
 const DEFAULT_SORT_MODE = "updatedDesc";
 const SORT_MODES = new Set(["updatedDesc", "updatedAsc", "titleAsc", "titleDesc"]);
 const DEFAULT_DATE_VIEW = "active";
@@ -259,6 +268,8 @@ let sortMode = readSortMode();
 let hasTriedRestoreOpenMemo = false;
 let currentAttachments = [];
 let dialogSearchQuery = "";
+let browserAiBaseSession = null;
+let browserAiBusy = false;
 
 function readDisplaySettings() {
   try {
@@ -763,6 +774,256 @@ function applyAutoTags({ silent = false, onlyWhenEmpty = false } = {}) {
 
   showTagSuggestions();
   return mergedTags;
+}
+
+function getBrowserLanguageModel() {
+  return window.LanguageModel || window.ai?.languageModel || null;
+}
+
+function setBrowserAiStatus(message, state = "") {
+  if (browserAiStatus) browserAiStatus.textContent = message;
+  if (browserAiPanel) {
+    if (state) browserAiPanel.dataset.state = state;
+    else delete browserAiPanel.dataset.state;
+  }
+}
+
+function setBrowserAiBusy(isBusy) {
+  browserAiBusy = isBusy;
+  browserAiActionButtons.forEach((button) => {
+    button.disabled = isBusy;
+  });
+  if (browserAiCheckButton) browserAiCheckButton.disabled = isBusy;
+}
+
+function dispatchEditorInputEvents() {
+  titleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+  bodyInput?.dispatchEvent(new Event("input", { bubbles: true }));
+  tagsInput?.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function createAiContext() {
+  const title = titleInput?.value.trim() || "";
+  const body = bodyInput?.value.trim() || "";
+  const tags = parseTags(tagsInput?.value || "");
+  const source = [
+    title ? `タイトル: ${title}` : "",
+    tags.length ? `タグ: ${tags.join(", ")}` : "",
+    body ? `本文:\n${body}` : "",
+  ].filter(Boolean).join("\n\n");
+
+  return source.slice(0, BROWSER_AI_CONTEXT_LIMIT);
+}
+
+function cleanAiText(text) {
+  return String(text || "")
+    .replace(/^```(?:json|markdown|md|text)?\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
+}
+
+function cleanAiTitle(text) {
+  return cleanAiText(text)
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[-*#\d.、\s]+/, "").trim())
+    .filter(Boolean)[0]
+    ?.replace(/^["「『]|["」』]$/g, "")
+    .slice(0, TITLE_MAX_LENGTH) || "";
+}
+
+function extractAiTags(text) {
+  const cleaned = cleanAiText(text);
+  let candidates = [];
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed)) candidates = parsed;
+    else if (Array.isArray(parsed?.tags)) candidates = parsed.tags;
+  } catch {}
+
+  if (candidates.length === 0) {
+    candidates = cleaned
+      .replace(/^[\s\S]*?タグ[:：]/, "")
+      .split(/[\n,、，]/);
+  }
+
+  const unique = [];
+  candidates.forEach((item) => {
+    const tag = cleanAutoTag(String(item).replace(/^[-*\d.、\s]+/, ""));
+    if (
+      tag &&
+      tag.length <= TAG_MAX_LENGTH &&
+      !unique.some((current) => current.toLowerCase() === tag.toLowerCase())
+    ) {
+      unique.push(tag);
+    }
+  });
+
+  return unique.slice(0, AUTO_TAG_LIMIT);
+}
+
+function appendAiSection(title, content) {
+  const cleaned = cleanAiText(content);
+  if (!cleaned || !bodyInput) return false;
+
+  const nextText = `${bodyInput.value.trimEnd()}\n\n## ${title}\n${cleaned}`.trim();
+  if (nextText.length > BODY_MAX_LENGTH) {
+    setBrowserAiStatus("AI結果を追加すると本文の上限を超えるため、短い内容で試してください。", "error");
+    return false;
+  }
+
+  bodyInput.value = nextText;
+  dispatchEditorInputEvents();
+  return true;
+}
+
+async function getBrowserAiAvailability(model) {
+  if (!model?.availability) return "unavailable";
+  try {
+    return await model.availability(BROWSER_AI_SESSION_OPTIONS);
+  } catch {
+    try {
+      return await model.availability();
+    } catch {
+      return "unavailable";
+    }
+  }
+}
+
+async function createBrowserAiSession(model) {
+  const systemPrompt = [
+    "あなたはNoteDeskのブラウザ内AIです。",
+    "ノート作成を助けるため、日本語で簡潔に回答してください。",
+    "ユーザーのノート本文に含まれない事実は追加しないでください。",
+  ].join(" ");
+
+  const createOptions = {
+    ...BROWSER_AI_SESSION_OPTIONS,
+    initialPrompts: [{ role: "system", content: systemPrompt }],
+    monitor(monitorTarget) {
+      monitorTarget.addEventListener("downloadprogress", (event) => {
+        const percent = Math.round((event.loaded || 0) * 100);
+        setBrowserAiStatus(`AIモデルを準備しています... ${percent}%`, "working");
+      });
+    },
+  };
+
+  try {
+    return await model.create(createOptions);
+  } catch (error) {
+    if (error?.name === "NotSupportedError") throw error;
+    return model.create({
+      initialPrompts: [{ role: "system", content: systemPrompt }],
+      monitor: createOptions.monitor,
+    });
+  }
+}
+
+async function ensureBrowserAiSession() {
+  if (browserAiBaseSession) return browserAiBaseSession;
+
+  const model = getBrowserLanguageModel();
+  if (!model?.create) {
+    throw new Error("このブラウザではブラウザAIを利用できません。Chrome/Edgeの対応版で試してください。");
+  }
+
+  const availability = await getBrowserAiAvailability(model);
+  if (availability === "unavailable") {
+    throw new Error("この端末ではブラウザAIを利用できません。PC版Chrome/Edge、十分な空き容量とメモリが必要です。");
+  }
+
+  if (availability === "downloadable") {
+    setBrowserAiStatus("AIモデルを準備します。初回はダウンロードに時間がかかる場合があります。", "working");
+  } else if (availability === "downloading") {
+    setBrowserAiStatus("AIモデルをダウンロード中です。完了までこの画面を開いたままお待ちください。", "working");
+  } else {
+    setBrowserAiStatus("ブラウザAIを準備しています。", "working");
+  }
+
+  browserAiBaseSession = await createBrowserAiSession(model);
+  setBrowserAiStatus("ブラウザAIを利用できます。", "ready");
+  return browserAiBaseSession;
+}
+
+async function promptBrowserAi(prompt) {
+  const baseSession = await ensureBrowserAiSession();
+  const session = typeof baseSession.clone === "function" ? await baseSession.clone() : baseSession;
+
+  try {
+    return cleanAiText(await session.prompt(prompt));
+  } finally {
+    if (session !== baseSession && typeof session.destroy === "function") {
+      session.destroy();
+    }
+  }
+}
+
+async function checkBrowserAiAvailability() {
+  if (browserAiBusy) return;
+  setBrowserAiBusy(true);
+  setBrowserAiStatus("ブラウザAIを確認しています。", "working");
+
+  try {
+    await ensureBrowserAiSession();
+  } catch (error) {
+    setBrowserAiStatus(error?.message || "ブラウザAIの確認に失敗しました。", "error");
+  } finally {
+    setBrowserAiBusy(false);
+  }
+}
+
+async function runBrowserAiAction(action) {
+  if (browserAiBusy) return;
+  const context = createAiContext();
+  if (!context) {
+    setBrowserAiStatus("先にタイトルか本文を入力してください。", "error");
+    return;
+  }
+
+  const prompts = {
+    title: `次のノート内容から、日本語の短いタイトルを1つだけ作ってください。記号や説明は付けないでください。\n\n${context}`,
+    summary: `次のノート内容を、日本語で3行以内に要約してください。箇条書きでも構いません。\n\n${context}`,
+    tags: `次のノート内容に合う日本語タグを最大5個だけ提案してください。回答はタグ名だけをカンマ区切りにしてください。\n\n${context}`,
+    checklist: `次のノート内容から、実行項目だけをMarkdownのチェックリストで作ってください。各行は "- [ ] " で始めてください。\n\n${context}`,
+    polish: `次のノート本文を、意味を変えずに読みやすい日本語へ整えてください。見出しや箇条書きが有効ならMarkdownで整えてください。\n\n${context}`,
+  };
+
+  if (!prompts[action]) return;
+
+  setBrowserAiBusy(true);
+  setBrowserAiStatus("AIで作成しています。", "working");
+
+  try {
+    const result = await promptBrowserAi(prompts[action]);
+
+    if (action === "title") {
+      const title = cleanAiTitle(result);
+      if (!title) throw new Error("タイトルを作成できませんでした。");
+      titleInput.value = title;
+      dispatchEditorInputEvents();
+      setBrowserAiStatus("タイトルを作成しました。", "ready");
+    } else if (action === "tags") {
+      const aiTags = extractAiTags(result);
+      if (aiTags.length === 0) throw new Error("タグ候補を作成できませんでした。");
+      tagsInput.value = mergeTags(tagsInput.value, aiTags);
+      dispatchEditorInputEvents();
+      showTagSuggestions();
+      setBrowserAiStatus(`${aiTags.length}件のAIタグを追加しました。`, "ready");
+    } else if (action === "summary") {
+      if (appendAiSection("AI要約", result)) setBrowserAiStatus("要約を本文に追加しました。", "ready");
+    } else if (action === "checklist") {
+      if (appendAiSection("AIチェックリスト", result)) setBrowserAiStatus("チェックリストを本文に追加しました。", "ready");
+    } else if (action === "polish") {
+      if (appendAiSection("AI整形案", result)) setBrowserAiStatus("整形案を本文に追加しました。", "ready");
+    }
+  } catch (error) {
+    const message = error?.name === "NotSupportedError"
+      ? "日本語のブラウザAIに対応していない環境です。Chrome/Edgeの対応版で試してください。"
+      : error?.message || "AI処理に失敗しました。少し短い本文で試してください。";
+    setBrowserAiStatus(message, "error");
+  } finally {
+    setBrowserAiBusy(false);
+  }
 }
 
 function readLayoutSetting() {
@@ -2713,6 +2974,10 @@ function bindMemoPage() {
   autoTagButton?.addEventListener("click", () => {
     applyAutoTags();
     tagsInput?.focus();
+  });
+  browserAiCheckButton?.addEventListener("click", checkBrowserAiAvailability);
+  browserAiActionButtons.forEach((button) => {
+    button.addEventListener("click", () => runBrowserAiAction(button.dataset.aiAction));
   });
 
   memoDialogCloseButton.addEventListener("click", closeMemoDialog);
